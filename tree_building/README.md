@@ -34,9 +34,7 @@ imply more coexisting lineages than the embryo actually had cells. See
 
 ## 4. Place the remaining cells
 
-`4_full_tree_placement/` attaches every cell not in the NJ backbone (the full
-per-side consensus, not just the `ge7_founderok` subset) onto the dated backbone
-by nearest-neighbour DTT distance, grafting each with a time-scaled pendant. See
+`4_full_tree_placement/` attaches every cell with at least 4 tapes that is not already in the NJ backbone onto the dated backbone by nearest-neighbour DTT distance, grafting each with a time-scaled pendant. See
 `4_full_tree_placement/README.md`.
 
 ## Tests
