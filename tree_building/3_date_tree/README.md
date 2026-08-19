@@ -41,6 +41,43 @@ RANK_TREE_B2=results/3-dated-tree/B2/lsd2/nj99478/minB2h/time_tree.nwk \
 
 This is the tree used downstream: `results/3-dated-tree/merged/merged_time_tree_ge7_attempt1_minage_sourced_minB2h_l0.01.nwk`.
 
+## 3. Sensitivity analysis: asymmetric B1/B2 split
+
+Step 2 assumes each side's cell-count ceiling is half the whole-embryo
+ceiling (`SIDE_FRAC_B1`/`SIDE_FRAC_B2`, both default `0.5`). To test
+sensitivity to that assumption -- e.g. an asymmetric 0.63/0.37 split -- rerun
+step 2 with those env vars overridden, staged under a separate `STAGEDIR` so
+the primary run's outputs are untouched:
+
+```
+# a. stage the existing divergence trees (2_root_tree's output) into the
+#    STAGEDIR layout run_constrained_dating.sh expects
+mkdir -p results/3-dated-tree-sensitivity/B1/lsd2/nj99478
+mkdir -p results/3-dated-tree-sensitivity/B2/lsd2/nj99478
+cp results/2-rooted-nj/divergence_nonneg_B1.nwk results/3-dated-tree-sensitivity/B1/lsd2/nj99478/tree_nonneg.nwk
+cp results/2-rooted-nj/divergence_nonneg_B2.nwk results/3-dated-tree-sensitivity/B2/lsd2/nj99478/tree_nonneg.nwk
+
+# b. run the constrained re-dating with the asymmetric split
+STAGEDIR=results/3-dated-tree-sensitivity MERGE_TOKEN=ge7 \
+RANK_TREE_B1=results/3-dated-tree/perside_B1_minB2h_unconstrained.nwk \
+RANK_TREE_B2=results/3-dated-tree/perside_B2_minB2h_unconstrained.nwk \
+VARIANT=attempt1_minage_sourced_minB2h_l0.01_sidefrac63-37 \
+SIDE_FRAC_B1=0.63 SIDE_FRAC_B2=0.37 \
+  bash 3_date_tree/run_constrained_dating.sh
+
+# c. copy the final outputs to flat, self-describing names (mirrors the
+#    perside_*/merged_* naming already used under results/3-dated-tree/)
+cp results/3-dated-tree-sensitivity/B1/lsd2/nj99478/attempt1_minage_sourced_minB2h_l0.01_sidefrac63-37/time_tree.nwk \
+   results/3-dated-tree-sensitivity/perside_B1_minB2h_lineage_constrained_sidefrac63-37.nwk
+cp results/3-dated-tree-sensitivity/B2/lsd2/nj99478/attempt1_minage_sourced_minB2h_l0.01_sidefrac63-37/time_tree.nwk \
+   results/3-dated-tree-sensitivity/perside_B2_minB2h_lineage_constrained_sidefrac63-37.nwk
+cp results/3-dated-tree-sensitivity/merged/merged_time_tree_ge7_attempt1_minage_sourced_minB2h_l0.01_sidefrac63-37.nwk \
+   results/3-dated-tree-sensitivity/merged_minB2h_lineage_constrained_sidefrac63-37.nwk
+```
+
+This reruns LSD2 constrained dating 3 iterations x 2 sides on trees with
+~400k (B1) and ~240k (B2) tips -- budget time/resources accordingly.
+
 ## External prerequisites
 
 - R + `ape`, `BAT`

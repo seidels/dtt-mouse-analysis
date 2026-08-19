@@ -22,6 +22,11 @@
 #   CEILING=processed_data/sample_matched_ceiling_sourced.csv
 #   NULLBLEN_B1=0.01   LSD2 -l for the constrained dating (per side). Default 0.01
 #   NULLBLEN_B2=0.01     (the data-justified value); MUST be tractable for the QP.
+#   SIDE_FRAC_B1=0.5   fraction of the whole-embryo cell-count ceiling this side's
+#   SIDE_FRAC_B2=0.5     tree is capped at (build_min_age_datefile.R's SIDE_FRAC arg).
+#                        Default is an even split; set both to an asymmetric pair
+#                        (e.g. 0.63/0.37) for a sensitivity run -- point STAGEDIR at
+#                        a separate namespace so it doesn't overwrite the primary run.
 #   VARIANT=attempt1_minage_sourced_minB2h_l0.01   output subdir + merged token part
 #   ITERS=3  ROOT_AGE=1.5  TIPS_AGE=13.5  SEQLEN=66  MINB=0.083333
 #   LSD_BIN=lsd2/src/lsd2
@@ -60,6 +65,7 @@ tag_for() { echo nj99478; }   # both v6 sides >50k tips -> nj99478
 # empty value -> -l omitted (LSD2 default). Must match what makes the QP tractable.
 nullblen_for() { case "$1" in B1) echo "${NULLBLEN_B1-0.01}" ;; B2) echo "${NULLBLEN_B2-0.01}" ;; esac; }
 rank_tree_for() { case "$1" in B1) echo "$RANK_TREE_B1" ;; B2) echo "$RANK_TREE_B2" ;; esac; }
+side_frac_for() { case "$1" in B1) echo "${SIDE_FRAC_B1:-0.5}" ;; B2) echo "${SIDE_FRAC_B2:-0.5}" ;; esac; }
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
@@ -90,7 +96,7 @@ date_side_constrained() {
         local datefile="${vdir}/min_age.iter${iter}.datefile"
         log "[$side iter$iter] building min-age ladder from $rank_tree"
         ROOT_DAY="$ROOT_AGE" Rscript "${SCRIPT_DIR}/build_min_age_datefile.R" \
-            "$rank_tree" "$CEILING" "$datefile" 0.5 2>&1 | tee "$LOGDIR/constr_${MERGE_TOKEN}_build_${side}_iter${iter}.log"
+            "$rank_tree" "$CEILING" "$datefile" "$(side_frac_for "$side")" 2>&1 | tee "$LOGDIR/constr_${MERGE_TOKEN}_build_${side}_iter${iter}.log"
 
         log "[$side iter$iter] LSD2 -d $(basename "$datefile") (minB=$MINB, -l ${nb:-(default)})"
         LSD_BIN="$LSD_BIN" LSD_ROOT="$ROOT_AGE" LSD_TIPS="$TIPS_AGE" LSD_SEQLEN="$SEQLEN" \

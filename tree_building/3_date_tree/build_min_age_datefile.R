@@ -27,8 +27,10 @@
 #                  sample_matched_ceiling_sourced.csv: columns day, cells_min,
 #                  cells_max, basis).
 #   3 OUT_DATEFILE path to write the LSD2 date file.
-#   4 SIDE_FRAC    fraction of the whole embryo this tree represents
-#                  (default 0.5 -- B1/B2 are the two first-division daughters).
+#   4 SIDE_FRAC    fraction of the whole embryo this tree represents (default
+#                  0.5). B1/B2 are the two first-division daughters but need
+#                  not split the embryo evenly -- pass per-side fractions
+#                  (e.g. 0.63/0.37) when that's better supported than 0.5/0.5.
 #
 # ENV (defaults match the per-side pipeline):
 #   ROOT_DAY  (default 1.5)  LSD_ROOT used in run_dating.sh
