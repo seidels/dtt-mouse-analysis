@@ -82,8 +82,8 @@ results <- lapply(T0_values, compute_gini_for_T0,
 gini_obs_df  <- do.call(rbind, lapply(results, `[[`, "obs"))
 gini_null_df <- do.call(rbind, lapply(results, `[[`, "null"))
 
-write.csv(gini_obs_df,  paste0(output_dir, "gini_over_time_T0sens.csv"),  row.names = FALSE)
-write.csv(gini_null_df, paste0(output_dir, "gini_nulls_over_time_T0sens.csv"), row.names =
+write.csv(gini_obs_df,  paste0(output_dir, "sensitivity_founder_gini.csv"),  row.names = FALSE)
+write.csv(gini_null_df, paste0(output_dir, "sensitivity_founder_gini_null.csv"), row.names =
             FALSE)
 
 
@@ -121,7 +121,7 @@ gini_diff |>
             half_max_diff = max(gini_diff)/2,
             half_max_time = T[which.max(gini_diff >= max(gini_diff)/2)])
 
-ggsave(paste0(output_dir, "Fig5_sensitivity_dating_clonal_dominance_gini.pdf"), p_d, height = 3.5, width = 4.5)
+ggsave(paste0(output_dir, "sensitivity_founder_gini.pdf"), p_d, height = 3.5, width = 4.5)
 
 
 p_d2 <- ggplot() +
@@ -135,7 +135,7 @@ p_d2 <- ggplot() +
 
 p_d2
 
-ggsave(paste0(output_dir, "Fig5_sensitivity_dating_clonal_dominance_gini_diff.pdf"), p_d2, height = 3.5, width = 4.5)
+ggsave(paste0(output_dir, "sensitivity_founder_gini_diff.pdf"), p_d2, height = 3.5, width = 4.5)
 
 
 ### 
@@ -152,7 +152,7 @@ trees = lapply(tree_files, function(x) {
 
 names(trees) = c("main", "sensitivity_63-37", "sensitivity_58-42")
 
-T0_values <- 6.0
+T0_values <- 7.0
 results_per_tree <- lapply(trees, compute_gini_for_T0,
                   T0 = T0_values, total_tips = total_tips, T_max = T_max,
                   n_grid = n_grid, R_gini_time = R_gini_time)
@@ -182,7 +182,7 @@ p_d <- ggplot() +
 
 p_d
 
-ggsave(paste0(output_dir, "Fig5_sensitivity_dating_clonal_dominance.pdf"), p_d, height = 3.5, width = 4.5)
+#ggsave(paste0("figures/sensitivity/", "sens_2"), p_d, height = 3.5, width = 4.5)
 
 #recreate the analysis per blastomere, e.g. using  some code from here to assign
 # a blastomere label
@@ -246,7 +246,7 @@ gini_blastomere_df <- do.call(rbind, lapply(names(trees), function(nm) {
   df
 }))
 
-write.csv(gini_blastomere_df, paste0(output_dir, "gini_over_time_perBlastomere.csv"), row.names = FALSE)
+write.csv(gini_blastomere_df, paste0("figures/sensitivity/", "gini_per_blastomere.csv"), row.names = FALSE)
 
 p_d3 <- ggplot(gini_blastomere_df, aes(x = T, y = gini, color = tree)) +
   geom_line(linewidth = 0.6) +
@@ -259,4 +259,4 @@ p_d3 <- ggplot(gini_blastomere_df, aes(x = T, y = gini, color = tree)) +
 
 p_d3
 
-ggsave(paste0(output_dir, "Fig5_sensitivity_dating_clonal_dominance_per_blastomere.pdf"), p_d3, height = 3.5, width = 7)
+ggsave(paste0("figures/sensitivity/", "gini_per_blastomere.pdf"), p_d3, height = 3.5, width = 7)
