@@ -10,7 +10,7 @@ library(Matrix)
 library(dplyr)
 library(stringr)
 library(ggplot2)
-library(gridExtra) 
+library(gridExtra)
 library(viridis)
 library(patchwork)
 
@@ -30,7 +30,7 @@ for(cnt in 1:batch_num){
     read_num_fastq = rbind(read_num_fastq, read_num_cnt)
 }
 print(sum(read_num_fastq$V1))
-### 6,871,057,007
+### 1,752,100,203
 
 ### summary the duplication rate
 read_num = NULL
@@ -42,13 +42,13 @@ for(cnt in 1:batch_num){
 
 print(summary(1 - read_num$V2/read_num$V1)) 
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
-# 0.1016  0.6360  0.6590  0.6568  0.6869  0.7469
+# 0.1017  0.6384  0.6615  0.6587  0.6891  0.7480
 
 print(sum(read_num$V1))
-### 6,336,677,681
+### 1,618,837,684
 
 print(sum(read_num$V2))
-### 2,101,809,902
+### 533,319,833
 
 ### saving and performing doublets removing on individual batches if necessary
 
@@ -56,7 +56,7 @@ df_cell_merge = NULL
 
 for(cnt in 1:batch_num){
   print(cnt)
-  load(paste0(work_path, "/data_processing/", experiment_id, "/nobackup/output_combine_", cnt, "/report/sci_summary.RData"))
+  load(paste0(work_path, "/data_processing/", experiment_id, "/nobackup/output_", cnt, "/report/sci_summary.RData"))
   colnames(df_gene) = c("gene_ID", "gene_type", "gene_short_name")
 
   keep = df_gene$gene_ID != "PEmax_dTomato"
@@ -109,13 +109,13 @@ for(cnt in 1:batch_num){
 }
 
 print(nrow(df_cell_merge))
-### nrow(df_cell) = 342,286
+### nrow(df_cell) = 297,290
 
 print(median(df_cell_merge$UMI_count))
-### 843
+### 1,052
 
 print(median(df_cell_merge$gene_count))
-### 608
+### 732
 
 print(sum(is.na(df_cell_merge$SampleName)))
 ### 0
@@ -204,7 +204,7 @@ print(sum(rownames(df) != rownames(df_cell)))
 df_cell$doublet_score = as.vector(df$doublet_score)
 df_cell$detected_doublets = df_cell$doublet_score > 0.2
 
-### sum(df_cell$detected_doublets)/nrow(df_cell) = 0.03554922
+### sum(df_cell$detected_doublets)/nrow(df_cell) = 0.03942951
 
 ###############################################################
 ### checking if sub-clusters include over 15% doublet cells ###
@@ -259,8 +259,8 @@ rownames(res) = as.vector(res$cell_id)
 res = res[rownames(df_cell),]
 df_cell$doublet_cluster = res$doublet_cluster
 
-### sum(df_cell$detected_doublets | df_cell$doublet_cluster) = 21357
-### sum(df_cell$detected_doublets | df_cell$doublet_cluster)/nrow(df_cell) = 0.06239519
+### sum(df_cell$detected_doublets | df_cell$doublet_cluster) = 19363
+### sum(df_cell$detected_doublets | df_cell$doublet_cluster)/nrow(df_cell) = 0.06513169
 saveRDS(df_cell, paste0(work_path, "/data_analysis/", experiment_id, "/df_cell.rds"))
 
 ### mv doublet_scores_observed_cells_*.csv doublet_cluster/

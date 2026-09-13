@@ -11,12 +11,13 @@ mouse_gene = read.table("/net/gs/vol1/home/cxqiu/work/tome/code/mouse.v37.geneID
 experiment_id = "experiment1_20260618_seq4_AD"
 
 fd = readRDS(paste0(work_path, "/df_gene.rds"))
+rownames(fd) = fd$gene_ID
 pd = readRDS(paste0(work_path, "/data_analysis/", experiment_id, "/df_cell.rds"))
 
 pd$log2_umi = log2(pd$UMI_count)
 pd$EXON_pct = 100 * pd$all_exon / (pd$all_exon + pd$all_intron)
 print(nrow(pd))
-### n = 342,286 cells
+### n = 297,290 cells
 
 ### calculate MT_pct and Ribo_pct per cell
 MT_gene = as.vector(fd[grep("^mt-",fd$gene_short_name),]$gene_ID)
@@ -40,16 +41,15 @@ pd_tmp = pd_tmp[rownames(pd),]
 pd$MT_pct = as.vector(pd_tmp$MT_pct)
 pd$RIBO_pct = as.vector(pd_tmp$RIBO_pct)
 
-
 pd_doublets_DEG = readRDS(paste0(work_path, "/data_analysis/", experiment_id,  "/doublet_cluster_2/res_doubelt_DEG.rds"))
 pd$doublets_DEG = pd$cell_id %in% pd_doublets_DEG$cell_id[pd_doublets_DEG$doublet_DEG]
 
 print(sum(pd$detected_doublets | pd$doublet_cluster | pd$doublets_DEG))
-### n = 23728
+### n = 23029; 7.7%
 pd = pd[!(pd$detected_doublets | pd$doublet_cluster | pd$doublets_DEG),]
 pd$detected_doublets = pd$doublet_cluster = pd$doublets_DEG = NULL
 print(nrow(pd))
-### 318558 cells
+### 274261 cells
 saveRDS(pd, paste0(work_path, "/data_analysis/", experiment_id, "/pd.rds"))
 
 ### first we removed cells with exon% > 85%
@@ -62,7 +62,7 @@ x2 = mean(x_tmp) + 2*sd(x_tmp)
 
 pd = pd[pd$log2_umi >= x1 & pd$log2_umi <= x2 & pd$EXON_pct <=85,]
 print(nrow(pd))
-### n = 252410 cells
+### n = 222532 cells
 
 ### In the big dataset, we did those filtering as well
 keep = pd$doublet_score <= 0.1 &
@@ -73,18 +73,15 @@ pd = pd[keep,]
 print(nrow(pd))
 print(median(pd$UMI_count))
 print(median(pd$gene_count))
-### n = 247308 cells
-### median(UMI_count) = 984
-### median(gene_count) = 691
-
-### For each cell, we only retain protein-coding genes, lincRNA genes and pseudogenes
-fd = fd[(fd$gene_type %in% c('protein_coding', 'pseudogene', 'lncRNA')) & fd$chr %in% paste0("chr", c(1:19, "M", "X", "Y")),]
+### n = 218654 cells
+### median(UMI_count) = 1169
+### median(gene_count) = 795
 
 count = NULL
 for(i in 1:batch_num){
     print(paste0("processing:",i,"/",batch_num))
     count_i = readRDS(paste0(work_path, "/data_analysis/", experiment_id, "/gene_count_", i, ".rds"))
-    count_i = count_i[fd$gene_ID, colnames(count_i) %in% rownames(pd)]
+    count_i = count_i[, colnames(count_i) %in% rownames(pd)]
     count = cbind(count, count_i)
 }
 print(sum(!colnames(count) %in% rownames(pd)))
@@ -93,15 +90,15 @@ count = count[,rownames(pd)]
 rownames(pd) = colnames(count) = pd$cell_id = 
     paste0("exp1_", colnames(count))
 
-obj = CreateSeuratObject(count, meta.data = pd)
-saveRDS(obj, paste0(work_path, "/data_analysis/", experiment_id, "/obj.rds"))
-saveRDS(pd, paste0(work_path, "/data_analysis/", experiment_id, "/obj_pd.rds"))
+saveRDS(pd, paste0(work_path, "/data_analysis/", experiment_id, "/pd_filter.rds"))
 
 ### output mtx and csv to generate h5ad used for analyzing using Scanpy/Python
 writeMM(t(count), paste0(work_path, "/data_analysis/", experiment_id, "/h5ad/gene_count.mtx"))
 write.table(rownames(count), paste0(work_path, "/data_analysis/", experiment_id, "/h5ad/df_gene.csv"), row.names=F, col.names=F, quote=F, sep=',')
 write.table(colnames(count), paste0(work_path, "/data_analysis/", experiment_id, "/h5ad/df_cell.csv"), row.names=F, col.names=F, quote=F, sep=',')
 
+rm doublet_cluster_2/obj_all.rds
+rm doublet_cluster_2/cluster_*_pd.rds
 
 
 
@@ -163,11 +160,11 @@ x2 = mean(pd_sub$log2_umi) + 2*sd(pd_sub$log2_umi)
 hist(pd_sub$log2_umi, 500); abline(v = x1); abline(v = x2)
 
 sum(pd$log2_umi >= x1 & pd$log2_umi <= x2 & pd$EXON_pct <=85)
-### 252410
+### 222532
 
 pd_sub = pd[pd$log2_umi >= x1 & pd$log2_umi <= x2 & pd$EXON_pct <=85,]
-median(pd_sub$UMI_count) ### 1001
-median(pd_sub$gene_count) ### 701
+median(pd_sub$UMI_count) ### 1184
+median(pd_sub$gene_count) ### 803
 
 p = pd %>% 
     filter(EXON_pct <= 85) %>%

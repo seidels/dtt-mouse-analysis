@@ -1,6 +1,9 @@
 
-#######################################
-### Step-3: perform dimension reduction
+
+#######################################################################
+### UMAP co-embedding of 1.58M scRNA-seq profiles from embryo #3 and
+### 1.65M from 7 timepoints of our high-temporal-resolution single-cell
+### atlas of mouse development (E12.75 - E14.25 in 6-hr increments)
 
 import scanpy as sc
 import anndata as ad
@@ -19,7 +22,6 @@ experiment_list = ["experiment1_20260618_seq4_AD",
                    "experiment1_20260618_seq6_UW",
                    "experiment2_20260713_seq2_XY"]
 
-
 adatas = []
 for experiment_id in experiment_list:
     print(experiment_id)
@@ -27,15 +29,35 @@ for experiment_id in experiment_list:
     adatas.append(a)
 
 adata = ad.concat(adatas, axis=0)
-adata.var = pd.read_csv(f"{work_path}/data_analysis/experiment1_20260618_seq1/h5ad/df_gene_all.csv", index_col=0)
 
-# Exclude sex + mito chromosomes
+del adatas
+gc.collect()
+
+mouse_gene = pd.read_csv("/net/gs/vol1/home/cxqiu/work/tome/code/mouse.v37.geneID.txt", sep="\t", index_col=4)
+adata.var = mouse_gene.loc[adata.var_names]
+
+# exclude sex + mito chromosomes, only keep lncRNA and protein_coding
 exclude_chrom = ['chrX', 'chrY', 'chrM']
-adata = adata[:, ~adata.var['chr'].isin(exclude_chrom)].copy()
-print(f"Done excluding {exclude_chrom}, remaining genes: {adata.n_vars}")
+keep_type = ['lncRNA', 'protein_coding']
+adata = adata[:, ~adata.var['chr'].isin(exclude_chrom) & adata.var['gene_type'].isin(keep_type)].copy()
+
 
 # Load jax data and align genes
-adata_jax = sc.read_h5ad("/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/gene_count/adata_jax.E12.75_E14.25.h5ad")
+day_list = ["E12.75","E13.0","E13.25","E13.5","E13.75","E14.0","E14.25"]
+
+adatas = []
+for day_id in day_list:
+    print(day_id)
+    a = sc.read_h5ad(f"/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/gene_count/adata.{day_id}.h5ad")
+    adatas.append(a)
+
+adata_jax = ad.concat(adatas, axis=0)
+
+del adatas
+gc.collect()
+
+
+# Merge two datasets by common genes
 common = adata.var_names.intersection(adata_jax.var_names)
 adata     = adata[:, common].copy()
 adata_jax = adata_jax[:, common].copy()
@@ -65,10 +87,10 @@ print("Done filtering in highly variable genes ...")
 sc.pp.scale(adata, max_value=10)
 print("Done scaling data ...")
 
-sc.tl.pca(adata, svd_solver='arpack', n_comps=30)
+sc.tl.pca(adata, svd_solver='arpack', n_comps=50)
 print("Done performing PCA ...")
 
-sc.pp.neighbors(adata, n_neighbors=50, n_pcs=30)
+sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
 print("Done computing neighborhood graph ...")
 
 sc.tl.umap(adata, min_dist=0.1, n_components=3)
@@ -88,7 +110,7 @@ pd.DataFrame(adata.obsm['X_pca']).to_csv(f"{work_path}/transcriptome_analysis/ad
 
 
 #########################################
-### performing knn to transferring labels
+### Performing knn to transferring labels
 
 import pandas as pd
 import numpy as np
@@ -135,10 +157,8 @@ pd.Series(jax_ids).to_csv(f"{work_path}/transcriptome_analysis/adata_integration
 
 
 
-
-
-################################
-### Step-4: plotting the 3D UMAP
+########################
+### Plotting the 3D UMAP
 
 source("~/work/scripts/utils.R")
 work_path = "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
@@ -150,7 +170,6 @@ pd_1 = pd[pd$dataset == 'jax',]
 pd_2 = pd[pd$dataset == 'tapemouse',]
 
 pd_jax = readRDS("/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/pd.rds")
-rownames(pd_jax) = pd_jax$cell_id = paste0(pd_jax$experiment_id, "_", pd_jax$cell_id)
 pd_1_x = pd_1 %>% left_join(pd_jax, by = "cell_id") %>% as.data.frame()
 rownames(pd_1_x) = pd_1_x$cell_id
 
@@ -173,16 +192,16 @@ celltype = apply(tmp, 1, function(x) names(which.max(table(x))))
 
 pd_2_x = data.frame(cell_id = rownames(knn), major_trajectory = major_trajectory, celltype = celltype)
 pd_2_x = pd_2 %>% left_join(pd_2_x, by = "cell_id")
-pd_2_x$RT_group = "Embryo_3"
+pd_2_x$SampleName = "Embryo_3"
 
 pd_1$major_trajectory = pd_1_x$major_trajectory
 pd_1$celltype = pd_1_x$celltype
-pd_1$RT_group = pd_1_x$RT_group
+pd_1$SampleName = pd_1_x$SampleName
 pd_1$day = pd_1_x$day
 
 pd_2$major_trajectory = pd_2_x$major_trajectory
 pd_2$celltype = pd_2_x$celltype
-pd_2$RT_group = pd_2_x$RT_group
+pd_2$SampleName = pd_2_x$SampleName
 pd_2$day = "E13.5"
 
 pd = rbind(pd_1, pd_2)
@@ -200,25 +219,17 @@ saveWidget(fig, paste0(save_path, "/tapemouse_celltype.html"), selfcontained = F
 fig = plot_ly(pd_sub[pd_sub$dataset == "tapemouse",], x=~UMAP_1, y=~UMAP_2, z=~UMAP_3, size = I(30), color = ~major_trajectory, colors = major_trajectory_color_plate)
 saveWidget(fig, paste0(save_path, "/tapemouse_major_trajectory.html"), selfcontained = FALSE, libdir = "tmp")
 
-pd_sub$major_trajectory = paste0(pd_sub$dataset, ": ", pd_sub$major_trajectory)
-fig = plot_ly(pd_sub, x=~UMAP_1, y=~UMAP_2, z=~UMAP_3, size = I(30), color = ~major_trajectory)
-saveWidget(fig, paste0(save_path, "/integration_major_trajectory.html"), selfcontained = FALSE, libdir = "tmp")
-
-pd_sub$celltype = paste0(pd_sub$dataset, ": ", pd_sub$celltype)
-fig = plot_ly(pd_sub, x=~UMAP_1, y=~UMAP_2, z=~UMAP_3, size = I(30), color = ~celltype)
-saveWidget(fig, paste0(save_path, "/integration_celltype.html"), selfcontained = FALSE, libdir = "tmp")
-
 pd_out = pd[pd$dataset == "tapemouse", c("cell_id", "major_trajectory", "celltype", "UMAP_1", "UMAP_2", "UMAP_3", "UMAP_2d_1", "UMAP_2d_2")]
 
-write.table(pd_out, paste0(save_path, "/cell_metadata.v6.txt"), row.names=F, quote=F, sep='\t')
+write.table(pd_out, paste0(save_path, "/cell_metadata.v8.txt"), row.names=F, quote=F, sep='\t')
 
 
-https://shendure-web.gs.washington.edu/content/members/cxqiu/private/nobackup/tapemouse/cell_metadata.v6.txt
+https://shendure-web.gs.washington.edu/content/members/cxqiu/private/nobackup/tapemouse/cell_metadata.v8.txt
 
 
 
-################################
-### Step-5: plotting the 2D UMAP
+########################
+### Plotting the 2D UMAP
 
 source("~/work/scripts/utils.R")
 work_path = "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
@@ -254,8 +265,8 @@ ggsave("~/share/Fig2_umap_jax.png", p, dpi = 300, height = 5, width = 5)
 
 
 
-#############################################################################
-###### Step-6: compare cell type compositions between new data and JAX E13.5
+#################################################################
+### Compare cell type compositions between new data and JAX E13.5
 
 pd = readRDS(paste0(work_path, "/transcriptome_analysis/adata_integration.obs.rds"))
 
@@ -295,8 +306,8 @@ df = df %>% left_join(major_trajectory_celltype, by = "celltype")
 
 df_x = df %>% filter(day == "E13.5")
 fit = cor.test(df_x$new_log2_frac, df_x$old_log2_frac, method = "spearman")
-print(fit$estimate) ### 0.95
-print(fit$p.val) ### < 1e-81
+print(fit$estimate) ### 0.94
+print(fit$p.val) ### < 1e-78
 
 p = ggplot(df %>% filter(day == "E13.5"), aes(x = new_log2_frac, y = old_log2_frac, color = major_trajectory)) +
   geom_point(size = 3) +
@@ -325,64 +336,128 @@ ggsave("~/share/Fig2_celltype_frac_2.pdf", p, height = 5, width = 4)
 
 
 
-############################################
-### jensen shannon divergence on proportions
 
-
-all_celltypes <- unique(pd$celltype)
-
-cell_num_1 = pd %>% 
-    filter(dataset == "tapemouse") %>% 
-    group_by(celltype) %>% 
-    tally() %>% 
-    complete(celltype = all_celltypes, fill = list(n = 0)) %>%
-    mutate(total_n = sum(n)) %>%
-    mutate(frac = n/total_n) %>%
-    select(celltype, new_frac = frac)
-
-cell_num_2 = pd %>% 
-    filter(dataset == "jax", day == "E13.5") %>% 
-    group_by(celltype) %>% 
-    tally() %>% 
-    complete(celltype = all_celltypes, fill = list(n = 0)) %>%
-    mutate(total_n = sum(n)) %>%
-    mutate(frac = n/total_n) %>%
-    select(celltype, old_frac = frac)
-
-df = cell_num_1 %>% left_join(cell_num_2, by = "celltype")
-
-p <- df$new_frac
-q <- df$old_frac
-m <- (p + q) / 2
-
-kl <- function(x, y) sum(x * log2(x / y), na.rm = TRUE)
-jsd <- 0.5 * kl(p, m) + 0.5 * kl(q, m)
-cat("JSD:", jsd, "\n")
-### 0.02764936
-
-
-#########################
-### Save data
+###########################################################################################
+### Comparing cell-type-compositions between backbone tree vs. placed cells vs. E13.5 atlas
 
 source("~/work/scripts/utils.R")
-work_path = "/net/shendure/vol8/projects/cxqiu/work/tapemouse"
-save_path = "/net/shendure/vol10/www/content/members/cxqiu/private/nobackup/tapemouse"
-
-pca = read.csv(paste0(work_path, "/transcriptome_analysis/adata_integration.pca.csv"))
-pca_x = read.csv(paste0(work_path, "/transcriptome_analysis/adata_integration.obs.csv"))
-
-pca = pca[,c(2:31)]
-colnames(pca) = paste0("PC_", 1:30)
-pca$cell_id = as.vector(pca_x$X)
+work_path = "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
+library(ape)
+library(tidyr)
 
 pd = readRDS(paste0(work_path, "/transcriptome_analysis/adata_integration.obs.rds"))
+all_celltypes = unique(pd$celltype)
 
-pd_out = pd %>% left_join(pca, by = "cell_id") %>% as.data.frame()
-
-write.table(pd_out, paste0(save_path, "/Integration_JAX_PCA.txt"), row.names=F, sep="\t", quote=F)
+major_trajectory_celltype_table = read.table(paste0(work_path, "/tree_analysis/major_trajectory_celltype_table.txt"), sep="\t", header=T)
 
 
-https://shendure-web.gs.washington.edu/content/members/cxqiu/private/nobackup/tapemouse/Integration_JAX_PCA.txt
+### subset cells with blastomere A and B
+dat_A = read.table(paste0(work_path, "/tree_analysis/e3v8.B1_tape_consensus.tsv.gz"), header = TRUE)
+dat_B = read.table(paste0(work_path, "/tree_analysis/e3v8.B2_tape_consensus.tsv.gz"), header = TRUE)
+
+### E13.5 atlas
+pd_E135 = pd %>% filter(day == "E13.5", dataset == "jax")
+
+### backbone
+tree_backbone = read.tree(paste0(work_path, "/tree_analysis/merged_minB2h_lineage_constrained.nwk"))
+
+pd_backbone_A = pd %>% filter(dataset == "tapemouse", 
+    cell_id %in% tree_backbone$tip.label, cell_id %in% dat_A$cell_id)
+
+pd_backbone_B = pd %>% filter(dataset == "tapemouse", 
+    cell_id %in% tree_backbone$tip.label, cell_id %in% dat_B$cell_id)
+
+### full-tree
+tree_full = read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
+
+pd_placed_A = pd %>% filter(dataset == "tapemouse", 
+    cell_id %in% tree_full$tip.label, cell_id %in% dat_A$cell_id, !cell_id %in% tree_backbone$tip.label)
+
+pd_placed_B = pd %>% filter(dataset == "tapemouse", 
+    cell_id %in% tree_full$tip.label, cell_id %in% dat_B$cell_id, !cell_id %in% tree_backbone$tip.label)
+
+
+### comparision and making plot
+
+get_frac <- function(pd, all_celltypes, min_frac = 0.01) {
+  pd %>%
+    group_by(celltype) %>%
+    tally() %>%
+    complete(celltype = all_celltypes, fill = list(n = 0)) %>%
+    mutate(total_n = sum(n),
+           frac = 100 * (n / total_n),
+           log2_frac = log2(frac + 1)) %>%
+    filter(frac >= min_frac) %>%
+    select(celltype, log2_frac)
+}
+
+plot_celltype_cor <- function(pd_x, pd_y,
+                              x_label, y_label,
+                              all_celltypes,
+                              celltype_table = major_trajectory_celltype_table,
+                              color_plate = major_trajectory_color_plate,
+                              min_frac = 0.01) {
+
+  df <- get_frac(pd_x, all_celltypes, min_frac) %>%
+    rename(x_log2_frac = log2_frac) %>%
+    inner_join(get_frac(pd_y, all_celltypes, min_frac) %>%
+                 rename(y_log2_frac = log2_frac),
+               by = "celltype") %>%
+    left_join(celltype_table, by = "celltype")
+
+  fit     <- cor.test(df$x_log2_frac, df$y_log2_frac, method = "spearman")
+  rho_lab <- round(unname(fit$estimate), 2)
+
+  # bound for tiny p, exact value otherwise
+  ttl <- if (fit$p.value < 1e-3) {
+    bquote("Spearman's" ~ rho == .(rho_lab) * "," ~
+             italic(p) < 10^.(ceiling(log10(fit$p.value))))
+  } else {
+    bquote("Spearman's" ~ rho == .(rho_lab) * "," ~
+             italic(p) == .(signif(fit$p.value, 2)))
+  }
+
+  ggplot(df, aes(x = x_log2_frac, y = y_log2_frac, color = major_trajectory)) +
+    geom_point(size = 3) +
+    theme_classic(base_size = 10) +
+    theme(legend.position = "none",
+          axis.text.x = element_text(color = "black"),
+          axis.text.y = element_text(color = "black"),
+          plot.title  = element_text(hjust = 0.5, size = 12)) +
+    labs(x = paste0("Log2(% of cells per cell type), ", x_label),
+         y = paste0("Log2(% of cells per cell type), ", y_label),
+         title = ttl) +
+    scale_color_manual(values = color_plate)
+}
+
+p1 <- plot_celltype_cor(pd_backbone_A, pd_placed_A,
+                        "backbone-blastomere-A", "placed-blastomere-A",
+                        all_celltypes)
+
+p2 <- plot_celltype_cor(pd_backbone_B, pd_placed_B,
+                        "backbone-blastomere-B", "placed-blastomere-B",
+                        all_celltypes)
+
+p3 <- plot_celltype_cor(pd_backbone_A, pd_E135,
+                        "backbone-blastomere-A", "atlas @E13.5",
+                        all_celltypes)
+
+p4 <- plot_celltype_cor(pd_backbone_B, pd_E135,
+                        "backbone-blastomere-B", "atlas @E13.5",
+                        all_celltypes)
+
+p5 <- plot_celltype_cor(pd_placed_A, pd_E135,
+                        "placed-blastomere-A", "atlas @E13.5",
+                        all_celltypes)
+
+p6 <- plot_celltype_cor(pd_placed_B, pd_E135,
+                        "placed-blastomere-B", "atlas @E13.5",
+                        all_celltypes)
+
+pp <- (p1 | p3 | p5) / (p2 | p4 | p6) &
+  theme(plot.margin = margin(t = 20, r = 20, b = 20, l = 20))
+
+ggsave("~/share/celltype_cor_grid.pdf", pp, width = 15, height = 10)
 
 
 

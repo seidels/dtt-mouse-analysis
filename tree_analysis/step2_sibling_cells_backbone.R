@@ -103,10 +103,11 @@ cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v8.txt")
 cell_meta <- cell_meta %>% select(cell_id, celltype = major_trajectory) %>% as.data.frame()
 
 
-#############
-### FULL TREE
 
-tree <- read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
+#################
+### BACKBONE TREE
+
+tree <- read.tree(paste0(work_path, "/tree_analysis/merged_minB2h_lineage_constrained.nwk"))
 
 B1 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B1_tape_consensus.tsv.gz"), header = TRUE)
 B2 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B2_tape_consensus.tsv.gz"), header = TRUE)
@@ -114,84 +115,56 @@ B2 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B2_tape_consensus.tsv.gz
 tree_tips_B1 <- tree$tip.label[tree$tip.label %in% B1$cell_id]
 tree_tips_B2 <- tree$tip.label[tree$tip.label %in% B2$cell_id]
 
-cell_meta_B1 = cell_meta[cell_meta$cell_id %in% tree_tips_B1,] %>%
-    group_by(celltype) %>% tally() %>%
-    mutate(total_n = sum(n), frac = 100 * (n / total_n)) %>%
-    filter(frac >= 0.01)
-cell_meta_B2 = cell_meta[cell_meta$cell_id %in% tree_tips_B2,] %>%
-    group_by(celltype) %>% tally() %>%
-    mutate(total_n = sum(n), frac = 100 * (n / total_n)) %>%
-    filter(frac >= 0.01)
-
-celltype_common = intersect(cell_meta_B1$celltype, cell_meta_B2$celltype)
-### n = 24 common major trajectories between two blastomeres
-
-res_B1 <- analyze_clade(tree, cell_meta, tree_tips_B1, "B1")
-res_B2 <- analyze_clade(tree, cell_meta, tree_tips_B2, "B2")
 res_all <- analyze_clade(tree, cell_meta, c(tree_tips_B1, tree_tips_B2), "All")
-
-fc_B1 <- compute_fold_change(res_B1$subtree, res_B1$sibling_pairs, res_B1$sibling_celltypes, cell_meta, strata = NULL)
-fc_B2 <- compute_fold_change(res_B2$subtree, res_B2$sibling_pairs, res_B2$sibling_celltypes, cell_meta, strata = NULL)
 fc_all <- compute_fold_change(res_all$subtree, res_all$sibling_pairs, res_all$sibling_celltypes, cell_meta, strata = NULL)
-
-saveRDS(fc_B1, paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_full_tree_reshuff_global_B1.rds"))
-saveRDS(fc_B2, paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_full_tree_reshuff_global_B2.rds"))
-saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_full_tree_reshuff_global_all.rds"))
+saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_backbone_tree_reshuff_global_all.rds"))
 
 ### summary
 sum(res_all$sibling_celltypes$celltype_A == res_all$sibling_celltypes$celltype_B)/nrow(res_all$sibling_celltypes)
-### 65% of tree-sibling pairs share a cell type
+### 64% of tree-sibling pairs share a cell type
 sum(fc_all$n_obs)/sum(fc_all$n_null_mean)
-### an 3.4-fold enrichment over a permuted null.
-
+### an 3.3-fold enrichment over a permuted null.
 
 ### summary (strict-two-tip-cherry)
 sum(res_all$sibling_celltypes$celltype_A == res_all$sibling_celltypes$celltype_B)/nrow(res_all$sibling_celltypes)
-### 54% of tree-sibling pairs share a cell type
+### 64% of tree-sibling pairs share a cell type
 sum(fc_all$n_obs)/sum(fc_all$n_null_mean)
-### an 2.8-fold enrichment over a permuted null.
+### an 3.2-fold enrichment over a permuted null.
 
+### correlation between full tree and backbone tree
+fc_all_full = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_full_tree_reshuff_global_all.rds"))
+fc_all_backbone = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_backbone_tree_reshuff_global_all.rds"))
 
-table_out = rbind(fc_B1 %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Blastomere_A"),
-  fc_B2 %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Blastomere_B"),
-  fc_all %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Both"))
+df = fc_all_full %>% select(celltype, full_log2_fc = fold_change) %>%
+    left_join(fc_all_backbone %>% select(celltype, backbone_log2_fc = fold_change))
 
-write.csv(table_out, paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajetcory.csv"), row.names=F, quote=F)
-
-
-
-# ---- Compare B1 and B2: major trajectory ----
-fc_B1 = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_full_tree_reshuff_global_B1.rds"))
-fc_B2 = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_full_tree_reshuff_global_B2.rds"))
-
-fc_compare <- fc_B1 %>%
-  select(celltype, fc_B1 = fold_change) %>%
-  inner_join(fc_B2 %>% select(celltype, fc_B2 = fold_change), by = "celltype") %>%
-  filter(celltype %in% celltype_common)
-
-cor_test <- cor.test(fc_compare$fc_B1, fc_compare$fc_B2,
+cor_test <- cor.test(df$full_log2_fc, df$backbone_log2_fc,
                      method = "spearman")
-cat("\nSpearman correlation between B1 and B2:", round(cor_test$estimate, 3),
+cat("\nSpearman correlation between full and backbone:", round(cor_test$estimate, 3),
     ", p =", format.pval(cor_test$p.value, digits = 3), "\n")
-### Spearman correlation between B1 and B2: 0.958 , p = 2.02e-13
 
-labels_df <- fc_compare %>% filter(fc_B1 > 10 & fc_B2 > 10)
-rng <- range(c(fc_compare$fc_B1, fc_compare$fc_B2), na.rm = TRUE)
+### Spearman correlation between full and backbone: 0.883 , p = 2.22e-06
 
-p1 <- ggplot(fc_compare, aes(x = fc_B1, y = fc_B2)) +
-  geom_point(aes(color = celltype), size = 3, alpha = 0.6) +
-  geom_text_repel(data = labels_df,
-                  aes(label = celltype),
-                  size = 3, color = "black",
-                  box.padding = 0.4, max.overlaps = Inf,
-                  seed = 1) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
-  theme_classic(base_size = 12) +
-  scale_color_manual(values = major_trajectory_color_plate) +
-  theme(axis.text = element_text(color = "black"), legend.position="none") +
-  coord_fixed(ratio = 1, xlim = rng, ylim = rng)
-  labs(x = "FC (B1)",
-       y = "FC (B2)")
+
+
+##################################################################
+### Repeat this analysis, but using a clade-restricted permutation
+
+split = castor::split_tree_at_height(tree, height = 7)
+
+tip_table <- data.frame(
+  tip   = tree$tip.label,
+  clade = split$clade2subtree[seq_along(tree$tip.label)]
+)
+### 3848 clones clades at E7.0, of mean size 170 and median size 32
+
+res_all <- analyze_clade(tree, cell_meta, c(tree_tips_B1, tree_tips_B2), "All")
+fc_all <- compute_fold_change(res_all$subtree, res_all$sibling_pairs, res_all$sibling_celltypes, cell_meta, strata = tip_table)
+saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_major_trajectory_backbone_tree_reshuff_clade_all.rds"))
+
+
+sum(fc_all$n_obs)/sum(fc_all$n_null_mean)
+### an 1.9-fold enrichment over a permuted null.
 
 
 
@@ -227,10 +200,12 @@ spearman_exact_p <- function(x, y) {
 cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v8.txt"),
                         header = TRUE, sep = "\t")
 
-#############
-### FULL TREE
 
-tree <- read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
+
+#################
+### BACKBONE TREE
+
+tree <- read.tree(paste0(work_path, "/tree_analysis/merged_minB2h_lineage_constrained.nwk"))
 
 B1 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B1_tape_consensus.tsv.gz"), header = TRUE)
 B2 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B2_tape_consensus.tsv.gz"), header = TRUE)
@@ -238,53 +213,59 @@ B2 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B2_tape_consensus.tsv.gz
 tree_tips_B1 <- tree$tip.label[tree$tip.label %in% B1$cell_id]
 tree_tips_B2 <- tree$tip.label[tree$tip.label %in% B2$cell_id]
 
-cell_meta_B1 = cell_meta[cell_meta$cell_id %in% tree_tips_B1,] %>%
-    group_by(celltype) %>% tally() %>%
-    mutate(total_n = sum(n), frac = 100 * (n / total_n)) %>%
-    filter(frac >= 0.01)
-cell_meta_B2 = cell_meta[cell_meta$cell_id %in% tree_tips_B2,] %>%
-    group_by(celltype) %>% tally() %>%
-    mutate(total_n = sum(n), frac = 100 * (n / total_n)) %>%
-    filter(frac >= 0.01)
-
-celltype_common = intersect(cell_meta_B1$celltype, cell_meta_B2$celltype)
-### n = 99 common cell types between two blastomeres
-
-
+res_all <- analyze_clade(tree, cell_meta, c(tree_tips_B1, tree_tips_B2), "All")
 res_B1 <- analyze_clade(tree, cell_meta, tree_tips_B1, "B1")
 res_B2 <- analyze_clade(tree, cell_meta, tree_tips_B2, "B2")
-res_all <- analyze_clade(tree, cell_meta, c(tree_tips_B1, tree_tips_B2), "All")
 
+fc_all <- compute_fold_change(res_all$subtree, res_all$sibling_pairs, res_all$sibling_celltypes, cell_meta, strata = NULL)
 fc_B1 <- compute_fold_change(res_B1$subtree, res_B1$sibling_pairs, res_B1$sibling_celltypes, cell_meta, strata = NULL)
 fc_B2 <- compute_fold_change(res_B2$subtree, res_B2$sibling_pairs, res_B2$sibling_celltypes, cell_meta, strata = NULL)
-fc_all <- compute_fold_change(res_all$subtree, res_all$sibling_pairs, res_all$sibling_celltypes, cell_meta, strata = NULL)
 
-saveRDS(fc_B1, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global_B1.rds"))
-saveRDS(fc_B2, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global_B2.rds"))
-saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global_all.rds"))
+
+saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_global_all.rds"))
+saveRDS(fc_B1, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_global_B1.rds"))
+saveRDS(fc_B2, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_global_B2.rds"))
 
 
 ### summary
 sum(res_all$sibling_celltypes$celltype_A == res_all$sibling_celltypes$celltype_B)/nrow(res_all$sibling_celltypes)
-### 51% of tree-sibling pairs share a cell type
+### 41% of tree-sibling pairs share a cell type
 sum(fc_all$n_obs)/sum(fc_all$n_null_mean)
-### an 9.4-fold enrichment over a permuted null.
+### an 7.9-fold enrichment over a permuted null.
 
 
 
 ### summary (strict-two-tip-cherry)
 sum(res_all$sibling_celltypes$celltype_A == res_all$sibling_celltypes$celltype_B)/nrow(res_all$sibling_celltypes)
-### 32% of tree-sibling pairs share a cell type
+### 40% of tree-sibling pairs share a cell type
 sum(fc_all$n_obs)/sum(fc_all$n_null_mean)
-### an 5.9-fold enrichment over a permuted null.
+### an 7.7-fold enrichment over a permuted null.
 
+
+x = read.csv(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global.csv"))
+celltype_common = unique(x$celltype)
 
 table_out = rbind(fc_B1 %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Blastomere_A"),
   fc_B2 %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Blastomere_B"),
   fc_all %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Both"))
 
-write.csv(table_out, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global.csv"), row.names=F, quote=F)
+write.csv(table_out, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_global.csv"), row.names=F, quote=F)
 
+
+
+### correlation between full tree and backbone tree
+fc_all_full = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global_all.rds"))
+fc_all_backbone = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_global_all.rds"))
+
+df = fc_all_full %>% select(celltype, full_log2_fc = fold_change) %>%
+    left_join(fc_all_backbone %>% select(celltype, backbone_log2_fc = fold_change))
+
+cor_test <- cor.test(df$full_log2_fc, df$backbone_log2_fc,
+                     method = "spearman")
+cat("\nSpearman correlation between full and backbone:", round(cor_test$estimate, 3),
+    ", p =", format.pval(cor_test$p.value, digits = 3), "\n")
+
+### Spearman correlation between full and backbone: 0.943 , p = <2e-16
 
 
 
@@ -297,73 +278,76 @@ tip_table <- data.frame(
   tip   = tree$tip.label,
   clade = split$clade2subtree[seq_along(tree$tip.label)]
 )
-### 3849 clades at E7 in the full tree
+### 3848 clones clades at E7.0, of mean size 170 and median size 32
 
-res_all <- analyze_clade(tree, cell_meta, c(tree_tips_B1, tree_tips_B2), "All")
-res_B1 <- analyze_clade(tree, cell_meta, tree_tips_B1, "B1")
-res_B2 <- analyze_clade(tree, cell_meta, tree_tips_B2, "B2")
 
 fc_all <- compute_fold_change(res_all$subtree, res_all$sibling_pairs, res_all$sibling_celltypes, cell_meta, strata = tip_table)
 fc_B1 <- compute_fold_change(res_B1$subtree, res_B1$sibling_pairs, res_B1$sibling_celltypes, cell_meta, strata = tip_table)
 fc_B2 <- compute_fold_change(res_B2$subtree, res_B2$sibling_pairs, res_B2$sibling_celltypes, cell_meta, strata = tip_table)
 
 
-saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_clade_all.rds"))
-saveRDS(fc_B1, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_clade_B1.rds"))
-saveRDS(fc_B2, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_clade_B2.rds"))
+saveRDS(fc_all, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_clade_all.rds"))
+saveRDS(fc_B1, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_clade_B1.rds"))
+saveRDS(fc_B2, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_clade_B2.rds"))
 
 
 sum(fc_all$n_obs)/sum(fc_all$n_null_mean)
-### an 2.1-fold enrichment over a permuted null.
+### an 2.8-fold enrichment over a permuted null.
+
+x = read.csv(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global.csv"))
+celltype_common = unique(x$celltype)
 
 
 table_out = rbind(fc_B1 %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Blastomere_A"),
   fc_B2 %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Blastomere_B"),
   fc_all %>% filter(celltype %in% celltype_common) %>% mutate(blastomere = "Both"))
 
-write.csv(table_out, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_clade.csv"), row.names=F, quote=F)
+write.csv(table_out, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_clade.csv"), row.names=F, quote=F)
+
+
+setwd('/net/shendure/vol2/projects/cxqiu/work/tapemouse/tree_analysis/sibling_cells')
+x1 = read.csv('fc_celltype_full_tree_reshuff_global.csv')
+x2 = read.csv('fc_celltype_full_tree_reshuff_clade.csv')
+x3 = read.csv('fc_celltype_backbone_tree_reshuff_global.csv')
+x4 = read.csv('fc_celltype_backbone_tree_reshuff_clade.csv')
+
+x = x1 %>% left_join(x2, by = c("celltype", "blastomere")) %>%
+left_join(x3, by = c("celltype", "blastomere")) %>%
+left_join(x4, by = c("celltype", "blastomere"))
+
+write.csv(x, paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype.csv"), row.names=F, quote=F)
 
 
 
+x = res_all$sibling_celltypes %>% filter(celltype_A == celltype_B) %>%
+    group_by(celltype_A) %>% tally() %>% filter(n >= 5)
+# n = 88 cell types with at least five same-type sibling pairs
+
+fc_all_sub = fc_all %>% filter(celltype %in% x$celltype_A)
+
+> summary(fc_all_sub$fold_change)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
+  1.890   4.595   6.245   7.484   9.027  30.769
+
+# enrichments remained above 1.0 for all 88 cell types with at least five same-type sibling pairs
 
 
+fc_all_reshuff_global = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_global_all.rds"))
+fc_all_reshuff_clade = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_backbone_tree_reshuff_clade_all.rds"))
 
+fc_all_reshuff_global[fc_all_reshuff_global$celltype == "Melanocyte cells",]
+fc_all_reshuff_clade[fc_all_reshuff_clade$celltype == "Melanocyte cells",]
+### 47 -> 31
 
+fc_all_reshuff_global[fc_all_reshuff_global$celltype == "Dorsal telencephalon",]
+fc_all_reshuff_clade[fc_all_reshuff_clade$celltype == "Dorsal telencephalon",]
+### 50 -> 18
 
-# ---- Compare B1 and B2: major trajectory ----
-fc_B1 = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global_B1.rds"))
-fc_B2 = readRDS(paste0(work_path, "/tree_analysis/sibling_cells/fc_celltype_full_tree_reshuff_global_B2.rds"))
+df = fc_all_reshuff_global %>% select(celltype, fc_global = fold_change) %>%
+    inner_join(fc_all_reshuff_clade %>% select(celltype, fc_clade = fold_change), by = "celltype") %>%
+    filter(celltype %in% x$celltype_A)
 
-fc_compare <- fc_B1 %>%
-  select(celltype, fc_B1 = fold_change) %>%
-  inner_join(fc_B2 %>% select(celltype, fc_B2 = fold_change), by = "celltype") %>%
-  filter(celltype %in% celltype_common) %>%
-  left_join(major_trajectory_celltype_table, by = "celltype")
-
-res <- spearman_exact_p(fc_compare$fc_B1, fc_compare$fc_B2)
-cat("\nSpearman correlation between B1 and B2:", round(res$rho, 3),
-    ", p =", ifelse(res$p > 0, format(res$p, digits = 3, scientific = TRUE),
-                    sprintf("~1e%.0f", res$log10_p)),
-    sprintf("(n = %d)\n", res$n))
-### Spearman correlation between B1 and B2: 0.94 , p = 3.58e-47 (n = 99)
-
-labels_df <- fc_compare %>% filter(fc_B1 > 50 | fc_B2 > 50)
-rng <- range(c(fc_compare$fc_B1, fc_compare$fc_B2), na.rm = TRUE)
-
-p1 <- ggplot(fc_compare, aes(x = fc_B1, y = fc_B2)) +
-  geom_point(aes(color = major_trajectory), size = 3, alpha = 0.6) +
-  geom_text_repel(data = labels_df,
-                  aes(label = celltype),
-                  size = 3, color = "black",
-                  box.padding = 0.4, max.overlaps = Inf,
-                  seed = 1) +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
-  theme_classic(base_size = 12) +
-  scale_color_manual(values = major_trajectory_color_plate) +
-  theme(axis.text = element_text(color = "black"), legend.position="none") +
-  coord_fixed(ratio = 1, xlim = rng, ylim = rng)
-  labs(x = "FC (B1)",
-       y = "FC (B2)")
-
+cor.test(df$fc_global, df$fc_clade, method = "spearman")
+# Spearman rho = 0.45; p = 1e-5
 
 

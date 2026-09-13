@@ -1,75 +1,41 @@
 
 
-######################
-### Making Figure - S8
+#####################################################
+### Figure S8. Reliability of backbone tree topology.
 
-
-###########
-### Fig-8C: 
+##################################################################
+### Fig. S8B: Leave-one-tape-out validation of reconstructed tree.
 
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(tidyverse)
 
-data_path = "/Volumes/f0085ts/work/tapemouse/figures_data"
+data_path = "/Volumes/f0085ts/work/tapemouse/making_figures/FigSR7"
 save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
 
-dat = read.csv(paste0(data_path, "/figS8C_k15_vs_k200_AB.csv"))
+dat = read.csv(paste0(data_path, "/panel_heldout_tape_distance_correlation.csv"))
 
-df_A = dat[,c("log2_enr_A_K200", "log2_enr_A_K15", "category")]
-colnames(df_A) = c("log2_enr_K200", "log2_enr_K15", "category")
-df_A$blastomere = "blastomere_A"
+dat_long <- dat |>
+    pivot_longer(
+        cols = c(rho_leave_one_out, rho_random_mean),
+        names_to = "type",
+        values_to = "rho"
+    ) |>
+    mutate(
+        type = factor(type, 
+                      levels = c("rho_leave_one_out", "rho_random_mean"),
+                      labels = c("Leave-one-out", "Random (mean)")),
+        scenario = factor(scenario, levels = c("random", "clade"))
+    )
 
-df_B = dat[,c("log2_enr_B_K200", "log2_enr_B_K15", "category")]
-colnames(df_B) = c("log2_enr_K200", "log2_enr_K15", "category")
-df_B$blastomere = "blastomere_B"
-
-df = rbind(df_A, df_B)
-
-p = ggplot() +
-    geom_point(data = df, aes(x = log2_enr_K200, y = log2_enr_K15), color = "grey70", size = 1) +
-    geom_point(data = df[df$category != "neither",], aes(x = log2_enr_K200, y = log2_enr_K15), color = "white", size = 2) +
-    geom_point(data = df[df$category != "neither",], aes(x = log2_enr_K200, y = log2_enr_K15, color = category), size = 1.5) +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +
-    facet_wrap(~ blastomere, nrow = 1) +
-    labs(x = "log2 enrichment, K = 200", y = "log2 enrichment, K = 15", fill = NULL) +
-    scale_x_continuous(breaks = seq(-6, 5, by = 2), limits = c(-6, 5)) +
-    scale_y_continuous(breaks = seq(-6, 5, by = 2), limits = c(-6, 5)) +
+p = ggplot(dat_long, aes(x = type, y = rho)) +
+    geom_boxplot(outlier.shape = NA, fill = "grey90") +
+    geom_jitter(aes(color = heldout_tape), width = 0.2, size = 1.2, alpha = 0.8) +
+    facet_grid(blastomere ~ scenario) +
+    labs(x = NULL, y = expression(rho)) +
     theme_classic() +
-    scale_color_manual(
-        values = c(K15_only  = "#F28E2B",
-                   K200_only = "#1F77B4",
-                   both_K      = "#7A1F5C"))
+    theme(legend.position = "none") +
+    scale_color_manual(values = tapebc_color_plate)
 
-ggsave(paste0(save_path, "/FigS8/FigS8C.pdf"), p, height = 5, width = 11)
-
-###########
-### Fig-8D: 
-
-library(ggplot2)
-library(tidyr)
-library(dplyr)
-library(viridis)
-
-data_path = "/Volumes/f0085ts/work/tapemouse/figures_data"
-save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
-
-df = read.csv(paste0(data_path, "/figSXa_coupling_depth_AB.csv"))
-
-df_count = df %>% group_by(coupling_depth_A_E, coupling_depth_B_E) %>% tally()
-df_count$n = factor(df_count$n)
-
-p = ggplot() +
-    geom_point(data = df_count, aes(x = coupling_depth_A_E, y = coupling_depth_B_E), color = "grey70", size = 3) +
-    geom_point(data = df_count, aes(x = coupling_depth_A_E, y = coupling_depth_B_E, color = n), size = 2.5) +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +
-    labs(x = "coupling depth, blastomere A", y = "coupling depth, blastomere B", fill = NULL) +
-    scale_x_continuous(breaks = seq(7, 13, by = 1), limits = c(7, 13.5)) +
-    scale_y_continuous(breaks = seq(7, 13, by = 1), limits = c(7, 13.5)) +
-    theme_classic() +
-    scale_color_viridis(discrete=TRUE) 
-
-
-ggsave(paste0(save_path, "/FigS8/FigS8D.pdf"), p, height = 5, width = 6)
-
+ggsave(paste0(save_path, "/FigS8/FigSR7_Leave-one-tape-out.pdf"), p, height = 6, width = 6)

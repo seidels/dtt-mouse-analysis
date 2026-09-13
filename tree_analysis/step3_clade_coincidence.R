@@ -13,13 +13,13 @@ library(phangorn)
 work_path <- "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
 # ---- Load data ----
-cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v6.txt"),
+cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v8.txt"),
                         header = TRUE, sep = "\t")
 
-tree <- read.tree(paste0(work_path, "/tree_analysis/tree_qc_pass.nwk"))
+tree <- read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
 
-B1 <- read.table(paste0(work_path, "/tree_analysis/edit_rate/e3v5v6.B1_tape_consensus.tsv.gz"), header = TRUE)
-B2 <- read.table(paste0(work_path, "/tree_analysis/edit_rate/e3v5v6.B2_tape_consensus.tsv.gz"), header = TRUE)
+B1 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B1_tape_consensus.tsv.gz"), header = TRUE)
+B2 <- read.table(paste0(work_path, "/tree_analysis/e3v8.B2_tape_consensus.tsv.gz"), header = TRUE)
 
 tree_tips_B1 <- tree$tip.label[tree$tip.label %in% B1$cell_id]
 tree_tips_B2 <- tree$tip.label[tree$tip.label %in% B2$cell_id]
@@ -167,28 +167,16 @@ run_clade_analysis <- function(tree, cell_meta, clade_tips, blastomere_name, K,
 # ---- Run for each blastomere at K = 15 and K = 60 ----
 
 # Subset cell types represented by at least 100 cells in each blastomere subtree
-min_cells <- 100
+cell_meta_B1 = cell_meta[cell_meta$cell_id %in% tree_tips_B1,] %>%
+    group_by(celltype) %>% tally() %>%
+    filter(n >= 100)
+cell_meta_B2 = cell_meta[cell_meta$cell_id %in% tree_tips_B2,] %>%
+    group_by(celltype) %>% tally() %>%
+    filter(n >= 100)
 
-# Count cells per cell type in each blastomere separately
-ct_B1_counts <- cell_meta %>%
-  filter(cell_id %in% tree_tips_B1) %>%
-  count(celltype, name = "n_B1")
+shared_celltypes = intersect(cell_meta_B1$celltype, cell_meta_B2$celltype)
+# n = 88 cell types
 
-ct_B2_counts <- cell_meta %>%
-  filter(cell_id %in% tree_tips_B2) %>%
-  count(celltype, name = "n_B2")
-
-# Cell types with ≥ min_cells in BOTH blastomeres
-shared_celltypes <- ct_B1_counts %>%
-  inner_join(ct_B2_counts, by = "celltype") %>%
-  filter(n_B1 >= min_cells, n_B2 >= min_cells) %>%
-  pull(celltype) %>%
-  sort()
-
-cat("Cell types with ≥", min_cells, "cells in each blastomere:",
-    length(shared_celltypes), "\n")
-
-### n = 82 cell types
 
 for (K in c(15, 200)) {
   res <- run_clade_analysis(tree, cell_meta, tree_tips_B1, "Blastomere A", K, shared_celltypes)
@@ -206,7 +194,7 @@ for (K in c(15, 200)) {
 
 # ---- Report the number of clades and mean/median of internal nodes ----
 
-for (K in c(15, 60, 200)) {
+for (K in c(15, 200)) {
   res <- readRDS(paste0(work_path, "/tree_analysis/clade_coincodence/res_B1_K", K, ".rds"))
   k_node = unique(res$clade_df[,c("node", "node_depth")])
   print(paste0("B1:K=", K, ", # = ", nrow(k_node), 
@@ -216,14 +204,19 @@ for (K in c(15, 60, 200)) {
   k_node = unique(res$clade_df[,c("node", "node_depth")])
   print(paste0("B2:K=", K, ", # = ", nrow(k_node), 
     ", ", round(mean(k_node$node_depth),2), " +/- ", round(sd(k_node$node_depth),2), "; median = ", round(median(k_node$node_depth),2) ))
+
+  res <- readRDS(paste0(work_path, "/tree_analysis/clade_coincodence/res_all_K", K, ".rds"))
+  k_node = unique(res$clade_df[,c("node", "node_depth")])
+  print(paste0("All:K=", K, ", # = ", nrow(k_node), 
+    ", ", round(mean(k_node$node_depth),2), " +/- ", round(sd(k_node$node_depth),2), "; median = ", round(median(k_node$node_depth),2) ))
 }
 
-[1] "B1:K=15, # = 86544, 11.24 +/- 1.58; median = 11.38"
-[1] "B2:K=15, # = 60289, 11.16 +/- 1.68; median = 11.28"
-[1] "B1:K=60, # = 30265, 10.17 +/- 1.67; median = 10.06"
-[1] "B2:K=60, # = 20880, 10.05 +/- 1.73; median = 9.91"
-[1] "B1:K=200, # = 10468, 9.24 +/- 1.6; median = 8.92"
-[1] "B2:K=200, # = 7174, 9.15 +/- 1.62; median = 8.83"
+[1] "B1:K=15, # = 82749, 11.16 +/- 1.58; median = 11.27"
+[1] "B2:K=15, # = 57969, 11.08 +/- 1.67; median = 11.16"
+[1] "All:K=15, # = 140718, 11.13 +/- 1.62; median = 11.23"
+[1] "B1:K=200, # = 10047, 9.2 +/- 1.6; median = 8.85"
+[1] "B2:K=200, # = 6769, 9.11 +/- 1.61; median = 8.79"
+[1] "All:K=200, # = 16816, 9.16 +/- 1.6; median = 8.83"
 
 
 
@@ -252,7 +245,17 @@ library(scales)
 library(patchwork)
 
 # ---- 1. Cell types + category info ----
-celltype_list <- read.table(paste0(work_path, "/tree_analysis/clade_coincodence/cell_type_categories.tsv"),
+
+x = res_all_K15$log2_enr
+x2 <- x
+diag(x2) <- 0
+hc  <- hclust(dist(x2), method = "ward.D2")
+ord <- rownames(x)[hc$order]
+ord
+
+write.table(ord, paste0(work_path, "/tree_analysis/clade_coincodence/cell_type_categories_old.tsv"), row.names=F, col.names=F, sep="\t", quote=F)
+
+celltype_list <- read.table(paste0(work_path, "/tree_analysis/clade_coincodence/cell_type_categories_new.tsv"),
                             header = TRUE, sep = "\t")
 ordered_ct <- celltype_list$cell_type
 n_ct       <- length(ordered_ct)
@@ -354,7 +357,8 @@ x = x[upper.tri(x)]
 y = y[upper.tri(y)]
 
 cor.test(x, y, method = "spearman")
-### 0.79
+### 0.7927594
+### < 2.2e-16
 
 
 
@@ -363,55 +367,6 @@ cor.test(x, y, method = "spearman")
 
 
 
-
-
-
-#####################################
-# Scatter plot between k=15 and k=200
-
-
-library(reshape2)
-library(ggplot2)
-library(patchwork)
-library(scales)
-library(RColorBrewer)
-
-
-
-
-res_K15  <- res_all_K15
-res_K200 <- res_all_K200
-
-# ---- Extract upper triangle (unique pairs, no diagonal) ----
-mat15  <- res_K15$log2_enr
-mat200 <- res_K200$log2_enr
-
-# Make sure rows/cols are in the same order across both matrices
-stopifnot(identical(rownames(mat15), rownames(mat200)),
-          identical(colnames(mat15), colnames(mat200)))
-
-idx <- which(upper.tri(mat15), arr.ind = TRUE)
-
-df <- data.frame(
-  CT_i    = rownames(mat15)[idx[, 1]],
-  CT_j    = colnames(mat15)[idx[, 2]],
-  K15     = mat15[idx],
-  K200    = mat200[idx]
-)
-
-# ---- Plot ----
-xy_min <- min(df$K15, df$K200, na.rm = TRUE)
-xy_max <- max(df$K15, df$K200, na.rm = TRUE)
-
-p = ggplot(df, aes(x = K15, y = K200)) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey80") +
-  geom_point(alpha = 0.6, size = 1.2) +
-  coord_fixed(xlim = c(xy_min, xy_max), ylim = c(xy_min, xy_max)) +
-  labs(x = "Log2 enrichment (K = 15)",
-       y = "Log2 enrichment (K = 200)") +
-  theme_classic(base_size = 10)
-
-ggsave("~/share/clade_enrichment_diff_K15_and_200_all.pdf", p, width = 5, height = 5)
 
 
 

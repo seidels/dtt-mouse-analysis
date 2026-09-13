@@ -1,6 +1,9 @@
 
-#######################################
-### Step-3: perform dimension reduction
+#######################################################################
+### UMAP co-embedding of 1.58M scRNA-seq profiles from embryo #3 and
+### ~5M from 21 timepoints of our high-temporal-resolution single-cell
+### atlas of mouse development (E8.5 - E13.5 in 6-hr increments)
+
 
 import scanpy as sc
 import anndata as ad
@@ -19,7 +22,6 @@ experiment_list = ["experiment1_20260618_seq4_AD",
                    "experiment1_20260618_seq6_UW",
                    "experiment2_20260713_seq2_XY"]
 
-
 adatas = []
 for experiment_id in experiment_list:
     print(experiment_id)
@@ -27,15 +29,40 @@ for experiment_id in experiment_list:
     adatas.append(a)
 
 adata = ad.concat(adatas, axis=0)
-adata.var = pd.read_csv(f"{work_path}/data_analysis/experiment1_20260618_seq1/h5ad/df_gene_all.csv", index_col=0)
 
-# Exclude sex + mito chromosomes
+del adatas
+gc.collect()
+
+mouse_gene = pd.read_csv("/net/gs/vol1/home/cxqiu/work/tome/code/mouse.v37.geneID.txt", sep="\t", index_col=4)
+adata.var = mouse_gene.loc[adata.var_names]
+
+# exclude sex + mito chromosomes, only keep lncRNA and protein_coding
 exclude_chrom = ['chrX', 'chrY', 'chrM']
-adata = adata[:, ~adata.var['chr'].isin(exclude_chrom)].copy()
-print(f"Done excluding {exclude_chrom}, remaining genes: {adata.n_vars}")
+keep_type = ['lncRNA', 'protein_coding']
+adata = adata[:, ~adata.var['chr'].isin(exclude_chrom) & adata.var['gene_type'].isin(keep_type)].copy()
+
+
 
 # Load jax data and align genes
-adata_jax = sc.read_h5ad("/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/gene_count/adata_jax.E8.5_E13.5.h5ad")
+day_list = ["E8.5", "E8.75", "E9.0", "E9.25", "E9.5", "E9.75", 
+"E10.0","E10.25","E10.5","E10.75",
+"E11.0","E11.25","E11.5","E11.75",
+"E12.0","E12.25","E12.5","E12.75",
+"E13.0","E13.25","E13.5"]
+
+adatas = []
+for day_id in day_list:
+    print(day_id)
+    a = sc.read_h5ad(f"/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/gene_count/adata.{day_id}.h5ad")
+    adatas.append(a)
+
+adata_jax = ad.concat(adatas, axis=0)
+
+del adatas
+gc.collect()
+
+
+# Merge two datasets by common genes
 common = adata.var_names.intersection(adata_jax.var_names)
 adata     = adata[:, common].copy()
 adata_jax = adata_jax[:, common].copy()
@@ -47,7 +74,7 @@ adata = ad.concat([adata, adata_jax], label="dataset", keys=["tapemouse", "jax"]
 print(adata.shape, adata.obs['dataset'].value_counts().to_dict())
 adata = adata.copy()
 
-del adata_jax, df_gene, common
+del adata_jax
 gc.collect()
 
 sc.pp.normalize_total(adata, target_sum=1e4)
@@ -65,10 +92,10 @@ print("Done filtering in highly variable genes ...")
 sc.pp.scale(adata, max_value=10)
 print("Done scaling data ...")
 
-sc.tl.pca(adata, svd_solver='arpack', n_comps=30)
+sc.tl.pca(adata, svd_solver='arpack', n_comps=50)
 print("Done performing PCA ...")
 
-sc.pp.neighbors(adata, n_neighbors=50, n_pcs=30)
+sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
 print("Done computing neighborhood graph ...")
 
 sc.tl.umap(adata, min_dist=0.1, n_components=3)
@@ -76,7 +103,7 @@ adata.obs['UMAP_1'] = list(adata.obsm['X_umap'][:,0])
 adata.obs['UMAP_2'] = list(adata.obsm['X_umap'][:,1])
 adata.obs['UMAP_3'] = list(adata.obsm['X_umap'][:,2])
 
-sc.tl.umap(adata, min_dist=0.3, n_components=2)
+sc.tl.umap(adata, min_dist=0.1, n_components=2)
 adata.obs['UMAP_2d_1'] = list(adata.obsm['X_umap'][:,0])
 adata.obs['UMAP_2d_2'] = list(adata.obsm['X_umap'][:,1])
 print("Done UMAP ...")
@@ -87,30 +114,8 @@ adata.obs.to_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.ob
 pd.DataFrame(adata.obsm['X_pca']).to_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca.csv")
 
 
-
-###########
-### calculating 100 PCs
-
-import scanpy as sc
-import anndata as ad
-import pandas as pd
-import numpy as np
-import os, sys
-import gc
-
-work_path = '/net/shendure/vol2/projects/cxqiu/work/tapemouse'
-
-adata = ad.read_h5ad(f"{work_path}/transcriptome_analysis/adata_integration_early.h5ad")
-
-sc.tl.pca(adata, svd_solver='arpack', n_comps=100)
-print("Done performing PCA ...")
-
-pd.DataFrame(adata.obsm['X_pca']).to_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca_100.csv")
-
-
-
-################################
-### Step-4: plotting the 3D UMAP
+########################
+### Plotting the 3D UMAP
 
 source("~/work/scripts/utils.R")
 work_path = "/net/shendure/vol8/projects/cxqiu/work/tapemouse"
@@ -163,32 +168,6 @@ saveWidget(fig, paste0(save_path, "/integration_E8_to_E13.5_major_trajectory.htm
 
 fig = plot_ly(pd_sub, x=~UMAP_1, y=~UMAP_2, z=~UMAP_3, size = I(30), color = ~celltype)
 saveWidget(fig, paste0(save_path, "/integration_E8_to_E13.5_celltype.html"), selfcontained = FALSE, libdir = "tmp")
-
-
-#########################
-### Save data
-
-source("~/work/scripts/utils.R")
-work_path = "/net/shendure/vol8/projects/cxqiu/work/tapemouse"
-save_path = "/net/shendure/vol10/www/content/members/cxqiu/private/nobackup/tapemouse"
-
-experiment_id = "experiment1_20260618_seq3"
-
-pca = read.csv(paste0(work_path, "/transcriptome_analysis/adata_integration_early.pca.csv"))
-pca_x = read.csv(paste0(work_path, "/transcriptome_analysis/adata_integration_early.obs.csv"))
-
-pca = pca[,c(2:31)]
-colnames(pca) = paste0("PC_", 1:30)
-pca$cell_id = as.vector(pca_x$X)
-
-pd = readRDS(paste0(work_path, "/transcriptome_analysis/adata_integration_early.obs.rds"))
-
-pd_out = pd %>% left_join(pca, by = "cell_id") %>% as.data.frame()
-
-write.table(pd_out, paste0(save_path, "/Integration_JAX_E8_to_E13.5_PCA.txt"), row.names=F, sep="\t", quote=F)
-
-
-https://shendure-web.gs.washington.edu/content/members/cxqiu/private/nobackup/tapemouse/Integration_JAX_E8_to_E13.5_PCA.txt
 
 
 

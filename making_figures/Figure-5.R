@@ -1,17 +1,18 @@
 
 
-#####################
-### Making Figure - 6
+#######################################################################
+### Figure 5. Lineage predicts fate at every scale, from sibling pairs 
+### to a dated hierarchy of cell-type couplings
 
 
-###########
-### Fig-6A: 
+#############################################################################
+### Fig. 5A: Heatmap of the 37 progenitor & post-mitotic heterotypic pairings
 
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 
-data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v6/heterotypic"
+data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v8/heterotypic"
 save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
 
 dat = read.csv(paste0(data_path, "/fig6B_captured_divisions.csv"))
@@ -19,25 +20,24 @@ dat = read.csv(paste0(data_path, "/fig6B_captured_divisions.csv"))
 plot_dat <- dat %>%
     mutate(log2_fold = log2(fold))
 
-# optional: control row/column order (otherwise ggplot orders alphabetically)
 prog_levels <- c(
     "Border-associated macrophages",
     "Definitive early erythroblasts (CD36-)",
     "Hematopoietic stem cells (Cd34+)",
     "Hematopoietic stem cells (Mpo+)",
     "Kupffer cells",
-    "Microglia",
-    "Myoblasts",
-    "Myofibroblasts",
     "Myelinating Schwann cells",
     "Myelinating Schwann cells (Tgfb2+)",
     "Neural crest (PNS glia)",
+    "Astrocytes",
     "Dorsal telencephalon",
     "Eye field",
     "Hindbrain",
+    "Hypothalamus",
     "Intermediate neuronal progenitors",
     "Naive retinal progenitor cells",
     "Olfactory bulb cells",
+    "Retinal progenitor cells",
     "Spinal cord dorsal progenitors",
     "Spinal cord/r7/r8",
     "Telencephalon",
@@ -52,7 +52,6 @@ post_levels <- c(
     "Megakaryocytes",
     "Osteoclasts",
     "Primitive erythroid cells",
-    "Myotubes",
     "Neural crest (PNS neurons)",
     "Parasympathetic neurons",
     "Sympathetic neurons",
@@ -60,8 +59,10 @@ post_levels <- c(
     "Cerebellar Purkinje cells",
     "Cranial motor neurons",
     "Deep-layer neurons",
+    "GABAergic cortical interneurons",
     "GABAergic neurons",
     "Retinal ganglion cells",
+    "Spinal cord motor neurons",
     "Granular keratinocytes",
     "Olfactory sensory neurons",
     "Otic sensory neurons"
@@ -85,19 +86,17 @@ p = ggplot(plot_dat, aes(x = postmitotic, y = progenitor, fill = log2_fold)) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           plot.title = element_text(hjust = 0.5))
 
-ggsave(paste0(save_path, "/Fig6/Fig6A.pdf"), p, height = 9, width = 4.5)
+ggsave(paste0(save_path, "/Fig5/Fig5A.pdf"), p, height = 9, width = 4.5)
 
 
-
-
-###########
-### Fig-6C: 
+####################################################
+### Fig. 5C: Timed fate couplings between cell types
 
 library(ggplot2)
 library(dplyr)
 library(forcats)
 
-data_path = "/Volumes/f0085ts/work/tapemouse/figures_data"
+data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v8/coupling_depth"
 save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
 
 dat = read.csv(paste0(data_path, "/figXa_coupling_carpet.csv"))
@@ -132,7 +131,7 @@ p = ggplot(plot_dat, aes(clade_ancestor_age_E, pair, fill = log2_enrichment_mean
     ) +
     scale_y_discrete(expand = c(0, 0)) +
     labs(
-        title    = "Cell-type coupling across developmental time  (n = 123 pairs)",
+        title    = "Cell-type coupling across developmental time  (n = 129 pairs)",
         subtitle = "clades defined by the age of their dated ancestor; rows ordered by coupling depth; white dots = significant in both blastomeres",
         x = "developmental time of the clade ancestor  (earlier to the left)",
         y = NULL
@@ -147,22 +146,19 @@ p = ggplot(plot_dat, aes(clade_ancestor_age_E, pair, fill = log2_enrichment_mean
         legend.key.width   = unit(0.35, "cm")
     )
 
-ggsave(paste0(save_path, "/Fig6/Fig6C.pdf"), p, height = 9, width = 9)
+ggsave(paste0(save_path, "/Fig5/Fig5C.pdf"), p, height = 9, width = 9)
 
-write.table(unique(plot_dat$pair), paste0(save_path, "/Fig6/Fig6C_rownames.txt"), row.names=F, col.names=F, sep="\t", quote=F)
-
-
+write.table(unique(plot_dat$pair), paste0(save_path, "/Fig5/Fig5C_rownames.txt"), row.names=F, col.names=F, sep="\t", quote=F)
 
 
-
-###########
-### Fig-6D: 
+######################################################
+### Fig. 5D: A draft hierarchy of timed fate couplings
 
 library(ggplot2)
 library(ggdendro)
 
-data_path <- "/Volumes/f0085ts/work/tapemouse/figures_data"
-save_path <- "/Volumes/f0085ts/work/tapemouse/making_figures"
+data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v8/coupling_depth"
+save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
 
 INK  <- "#1f2328"
 INK2 <- "#4a5158"
@@ -252,51 +248,39 @@ tops     <- subset(tops, age <= 13.25)     # 51 branch points
 
 # ---- 6. Group brackets (right side) -------------------------------------
 groups <- list(
-    "Floor plate"             = c("Hypothalamus", "Anterior floor plate", "Floorplate and p3 domain"),
-    "Endothelium"             = c("Endothelium", "Brain capillary endothelial cells", "Endocardial cells",
-                                  "Lymphatic vessel endothelial cells", "Liver sinusoidal endothelial cells"),
-    "Muscle"                  = c("Myofibroblasts", "Myoblasts", "Muscle progenitor cells"),
-    "Haematopoiesis"          = c("Microglia", "Mast cells", "Definitive erythroblasts (CD36+)",
-                                  "Primitive erythroid cells", "Hematopoietic stem cells (Mpo+)",
-                                  "Kupffer cells", "Megakaryocytes", "Border-associated macrophages",
-                                  "Hematopoietic stem cells (Cd34+)", "Definitive early erythroblasts (CD36-)"),
-    "Retina / eye field"      = c("Retinal progenitor cells", "Eye field", "Retinal ganglion cells",
-                                  "Naive retinal progenitor cells"),
-    "Hindbrain / spinal cord" = c("Spinal cord/r7/r8", "Spinal cord dorsal progenitors", "GABAergic neurons",
-                                  "Astrocytes", "Glutamatergic neurons", "Posterior roof plate",
-                                  "Spinal cord motor neurons", "Spinal cord ventral progenitors",
-                                  "Hindbrain", "Cerebellar Purkinje cells"),
-    "Telencephalon"           = c("Intermediate neuronal progenitors", "Deep-layer neurons", "Telencephalon",
-                                  "Dorsal telencephalon", "Choroid plexus", "Cajal-Retzius cells"),
-    "Diencephalon"            = c("Neural progenitor cells (Neurod1+)", "Diencephalon", "Thalamic neuronal precursors"),
-    "Mesenchyme"              = c("Sclerotome", "Facial mesenchyme", "Fibroblasts", "Dermatome",
-                                  "Pre-osteoblasts (Sp7+)", "Dermomyotome", "Limb mesenchyme progenitors",
-                                  "Early chondrocytes", "Chondrocytes (Atp1a2+)"),
-    "Kidney"                  = c("Nephron progenitors", "Metanephric mesenchyme", "Ureteric bud"),
-    "Keratinocytes"           = c("Pre-epidermal keratinocytes", "Granular keratinocytes",
-                                  "Branchial arch epithelium", "Lung progenitor cells"),
-    "Gut tube"                = c("Midgut/Hindgut epithelial cells", "Gut"),
-    "Otic"                    = c("Otic sensory neurons", "Otic epithelial cells"),
-    "Olfactory"               = c("Olfactory epithelial cells", "Olfactory bulb cells", "Olfactory sensory neurons"),
-    "Neural crest / PNS"      = c("Neural crest (PNS glia)", "Myelinating Schwann cells", "Sympathetic neurons",
-                                  "Neural crest (PNS neurons)", "Dorsal root ganglion neurons",
-                                  "Parasympathetic neurons", "Myelinating Schwann cells (Tgfb2+)",
-                                  "Cranial motor neurons", "Melanocyte cells")
+    "Otic"               = c("Otic sensory neurons", "Otic epithelial cells"),
+    "Gut tube"           = c("Pancreatic acinar cells", "Midgut/Hindgut epithelial cells"),
+    "Keratinocytes"      = c("Pre-epidermal keratinocytes", "Granular keratinocytes",
+                             "Branchial arch epithelium", "Lung progenitor cells"),
+    "Olfactory"          = c("Olfactory epithelial cells", "Olfactory bulb cells",
+                             "Olfactory sensory neurons"),
+    "Haematopoiesis"     = c("Microglia", "Definitive erythroblasts (CD36+)", "Mast cells",
+                             "Monocytes", "Hematopoietic stem cells (Mpo+)", "Kupffer cells",
+                             "Megakaryocytes", "Border-associated macrophages",
+                             "Hematopoietic stem cells (Cd34+)", "Primitive erythroid cells"),
+    "Retina / eye field" = c("Retinal progenitor cells", "Retinal pigment cells", "Eye field",
+                             "Retinal ganglion cells", "Naive retinal progenitor cells"),
+    "Neural crest / PNS" = c("Neural crest (PNS neurons)", "Dorsal root ganglion neurons",
+                             "Neural crest (PNS glia)", "Myelinating Schwann cells",
+                             "Sympathetic neurons", "Parasympathetic neurons",
+                             "Myelinating Schwann cells (Tgfb2+)", "Cranial motor neurons",
+                             "Melanocyte cells"),
+    "Kidney"             = c("Nephron progenitors", "Metanephric mesenchyme", "Ureteric bud")
 )
 
 grp_df <- do.call(rbind, lapply(names(groups), function(nm) {
     ys <- lab$x[match(groups[[nm]], lab$label)]
     ys <- ys[!is.na(ys)]
     if (!length(ys)) return(NULL)
-    data.frame(name = nm, y_pos = mean(ys), y_min = min(ys), y_max = max(ys),
+    data.frame(name = nm, y_pos = mean(range(ys)),          # midpoint, not mean
+               y_min = min(ys), y_max = max(ys),
                stringsAsFactors = FALSE)
 }))
 
 # ---- 7. Draw -------------------------------------------------------------
-depth_max     <- max(seg$y)          # max rank (root distance)
-label_x       <- 0.4                 # leaf label column
-bracket_x     <- 22                  # vertical bracket line (tweak to taste)
-group_text_x  <- 23
+depth_max    <- max(seg$y)
+label_x      <- 0.4                    # leaf label column (right side)
+group_text_x <- -(depth_max + 6)       # group label column (left of root)
 
 p <- ggplot() +
     geom_segment(data = seg,
@@ -312,31 +296,19 @@ p <- ggplot() +
               aes(x = label_x, y = x, label = label),
               hjust = 0, size = 2.2, colour = INK) +
     
-    # right-side brackets + group labels
-    geom_segment(data = grp_df,
-                 aes(x = bracket_x, xend = bracket_x,
-                     y = y_min - 0.3, yend = y_max + 0.3),
-                 colour = INK, linewidth = 0.35) +
-    geom_segment(data = grp_df,
-                 aes(x = bracket_x, xend = bracket_x - 0.4,
-                     y = y_min - 0.3, yend = y_min - 0.3),
-                 colour = INK, linewidth = 0.35) +
-    geom_segment(data = grp_df,
-                 aes(x = bracket_x, xend = bracket_x - 0.4,
-                     y = y_max + 0.3, yend = y_max + 0.3),
-                 colour = INK, linewidth = 0.35) +
+    # left-side group labels (no brackets)
     geom_text(data = grp_df,
               aes(x = group_text_x, y = y_pos, label = name),
               hjust = 0, size = 2.5, colour = INK, fontface = "italic") +
     
-    scale_x_continuous(expand = expansion(add = c(2, 8))) +
+    scale_x_continuous(expand = expansion(add = c(8, 10))) +
     scale_y_continuous(expand = expansion(add = c(0.4, 0.4))) +
     coord_cartesian(clip = "off") +
     
     labs(
         title    = "Cell types grouped by the depth at which their lineage coupling remains detectable",
         subtitle = "dates are coupling depths in E-days, not divergence times; groups closing earliest stay co-restricted deepest",
-        caption  = "the 51 branch points with a measured coupling depth are labelled with it (horizontal distance not to scale)",
+        caption  = "branch points labelled with the developmental time at which the group's coupling is still detectable (horizontal distance not to scale)",
         x = NULL, y = NULL
     ) +
     theme_void(base_size = 9) +
@@ -347,5 +319,5 @@ p <- ggplot() +
         plot.margin   = margin(12, 14, 12, 14)
     )
 
-ggsave(paste0(save_path, "/Fig6/Fig6D.pdf"), p, height = 10, width = 6)
+ggsave(paste0(save_path, "/Fig5/Fig5D.pdf"), p, height = 10, width = 4)
 

@@ -1,9 +1,11 @@
 
-#####################
-### Making Figure - 1
+##############################################################################
+### Figure 1. Pronuclear zygotic injection (PNI) of DNA Typewriter components 
+### identifies an embryo with robust levels of sequential editing by E13.5.
 
-#######################################
-### Fig-1b: integration-barcode summary
+#############################################################################################################
+### Fig. 1B: Number of distinct tape-BC sequences (unique integration barcodes; blue) 
+### and the estimated total number of genomic integrations after accounting for multi-copy barcodes (orange).
 
 library(ggplot2)
 library(tidyr)
@@ -39,8 +41,9 @@ p = ggplot(df_long, aes(x = embryo, y = value, fill = metric)) +
 ggsave(paste0(save_path, "/Fig1/Fig1_integration_barcode_summary.pdf"), p, height = 4, width = 4.5)
 
 
-############################################
-### Fig-1c: per-site editing rate per embryo
+#############################################################################################################
+### Fig. 1C: Per-monomer editing rates for each embryo, expressed as the fraction of resolved reads edited 
+### at each of the six monomers (colored 1-6), collapsed with respect to independent integrations.
 
 library(ggplot2)
 library(dplyr)
@@ -64,7 +67,8 @@ ggsave(paste0(save_path, "/Fig1/Fig1_per_site_editing_rate_per_embryo.pdf"), p, 
 
 
 ####################################################################
-### Fig-1d: per-site editing rate per integration for embryo #3 only
+### Fig. 1D: Per-monomer editing rate in embryo #3, shown separately 
+### for each of 11 single-copy tape-BC integrations.
 
 library(ggplot2)
 library(dplyr)
@@ -89,8 +93,9 @@ ggsave(paste0(save_path, "/Fig1/Fig1_per_site_editing_rate_per_integration_embry
 
 
 
-###############################
-### Fig-1e: site_insertion_freq
+####################################################################
+### Fig. 1E: Frequency of each insertional symbol at each of the six 
+### monomers in embryo #3, aggregated across integrations.
 
 library(ggplot2)
 library(dplyr)

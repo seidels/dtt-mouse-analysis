@@ -1,15 +1,16 @@
 
-#####################W
-### Making Figure - S5
+###############################################################################
+### Figure S10. Query cells are placed at short edit distances from their 
+### anchors and recover cell-type concordance nearly as well as backbone cells
 
-############
-### Fig-S5E: 
+##########################################
+### Fig. S10G: Terminal topology by origin
 
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 
-data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v6"
+data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v8"
 save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
 
 dat = read.csv(paste0(data_path, "/figS5EF_placement_concordance.csv"))
@@ -38,17 +39,17 @@ p <- ggplot(plot_dat, aes(x = bar, y = pct_of_origin, fill = tier)) +
     theme(axis.text.x = element_text(angle = 20, hjust = 1),
           panel.grid.major.x = element_blank())
 
-ggsave(paste0(save_path, "/FigS5/FigS3E.pdf"), p, height = 4, width = 7)
+ggsave(paste0(save_path, "/FigS10/FigS5E.pdf"), p, height = 4, width = 7)
 
 
-############
-### Fig-S5F: 
+############################################################################################################
+### Fig. S10H: For each cell, the fraction of its equally related nearest neighbors that share its cell type
 
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 
-data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v6"
+data_path = "/Users/cxqiu/GitHub/mouse_sprint/tape_pipeline/figures/v8"
 save_path = "/Volumes/f0085ts/work/tapemouse/making_figures"
 
 dat = read.csv(paste0(data_path, "/figS5EF_placement_concordance.csv"))
@@ -79,7 +80,7 @@ p = ggplot(plot_dat, aes(x = tier, y = concordance, fill = group)) +
     theme_classic(base_size = 12) +
     theme(panel.grid.major.x = element_blank())
 
-ggsave(paste0(save_path, "/FigS5/FigS5F.pdf"), p, height = 4, width = 8)
+ggsave(paste0(save_path, "/FigS10/FigS5F.pdf"), p, height = 4, width = 8)
 
 
 

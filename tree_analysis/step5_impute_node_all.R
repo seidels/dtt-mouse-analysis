@@ -26,7 +26,6 @@ pd$cell_id <- rownames(pd)
 
 pd_1 = pd[pd$dataset == "jax",]
 pd_jax <- readRDS("/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/pd.rds")
-pd_jax$cell_id <- paste0(pd_jax$experiment_id, "_", pd_jax$cell_id)
 pd_1_x = pd_1 %>% left_join(pd_jax, by = "cell_id")
 pd_1$day = pd_1_x$day
 pd_1$major_trajectory = pd_1_x$major_trajectory
@@ -34,7 +33,7 @@ pd_1$celltype = pd_1_x$celltype
 
 
 pd_2 = pd[pd$dataset == "tapemouse",]
-cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v6.txt"),
+cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v8.txt"),
                         header = TRUE, sep = "\t")
 pd_2_x = pd_2 %>% left_join(cell_meta, by = "cell_id")
 pd_2$day = "E13.5"
@@ -50,7 +49,7 @@ write.table(pd_x[,c("cell_id", "dataset", "day", "major_trajectory", "celltype")
 ##########################
 # ---- Load tree data ----
 
-tree <- read.tree(paste0(work_path, "/tree_analysis/tree_qc_pass.nwk"))
+tree <- read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
 
 depths <- node.depth.edgelength(tree)
 
@@ -115,7 +114,7 @@ from collections import defaultdict, deque
 
 work_path = "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
-pca_coor = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca_100.csv", index_col = 0)
+pca_coor = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca.csv", index_col = 0)
 pd_meta = pd.read_csv(f"{work_path}/tree_analysis/impute_nodes/pd.txt", sep = "\t", index_col = 0)
 pca_coor.index   = pd_meta.index
 pca_coor.columns = [f"PC_{i}" for i in range(1, pca_coor.shape[1] + 1)]
@@ -132,6 +131,8 @@ children_map = edge.groupby("parent")["child"].apply(list).to_dict()
 n_pc         = pca_impute.shape[1]
 tip_ids      = pca_impute.index.tolist()
 internal_ids = internal["node"].tolist()
+
+
 
 # ---- Topological sort: guarantee children-before-parent ----
 internal_set = set(internal_ids)
@@ -163,6 +164,9 @@ assert len(topo_order) == len(internal_ids), \
     f"topo sort produced {len(topo_order)} nodes, expected {len(internal_ids)}"
 
 internal_ids = topo_order
+# ---- Now internal_ids is ordered by topology (from bottom to top, children is always visited before its parent)
+
+
 
 # ---- Build combined matrix ----
 all_ids = tip_ids + internal_ids
@@ -199,7 +203,7 @@ import sys
 
 work_path = "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
-pca_coor = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca_100.csv", index_col = 0)
+pca_coor = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca.csv", index_col = 0)
 pd_meta = pd.read_csv(f"{work_path}/tree_analysis/impute_nodes/pd.txt", sep = "\t", index_col = 0)
 
 pca_coor.index   = pd_meta.index
@@ -209,12 +213,10 @@ internal = pd.read_csv(f"{work_path}/tree_analysis/impute_nodes/internal.tsv", s
 internal.index = internal["node"]
 pca_impute = pd.read_csv(f"{work_path}/tree_analysis/impute_nodes/pca_impute_full.tsv", sep="\t", index_col=0)
 
-
 day_list = ["E13.25","E13.0","E12.75","E12.5","E12.25","E12.0","E11.75","E11.5","E11.25","E11.0","E10.75","E10.5","E10.25","E10.0","E9.75","E9.5","E9.25","E9.0","E8.75","E8.5"]
 
 day = day_list[int(sys.argv[1]) - 1]
 print(day)
-
 
 pd_node  = internal[internal["day"] == day]
 pca_node = pca_impute.loc[pd_node["node"].values]
@@ -222,11 +224,10 @@ pca_node = pca_impute.loc[pd_node["node"].values]
 pd_cell  = pd_meta[pd_meta["day"] == day]
 pca_cell = pca_coor.loc[pd_cell["cell_id"].values]
 
-
 from annoy import AnnoyIndex
 from scipy.sparse import csr_matrix
 
-k_list = [20, 50, 100, 200]
+k_list = [200]
 
 n_dim = pca_node.shape[1]
 n_trees = 150
@@ -312,7 +313,7 @@ pd_E13.5 = read.table(paste0(work_path, "/tree_analysis/impute_nodes/pd_E13.5.ts
 
 day_list = c("E13.25","E13.0","E12.75","E12.5","E12.25","E12.0","E11.75","E11.5","E11.25","E11.0","E10.75","E10.5","E10.25","E10.0","E9.75","E9.5","E9.25","E9.0","E8.75","E8.5")
 
-for(k in c(20, 50, 100, 200)){
+for(k in c(200)){
     pd_internal_list = list()
     for(day in day_list){
         pd_internal_list[[day]] = read.table(paste0(work_path, "/tree_analysis/impute_nodes/assign/hits_df_", day, "_", k, ".txt"), header=T, sep='\t')
@@ -335,14 +336,9 @@ for(k in c(20, 50, 100, 200)){
 }
 
 
-[1] "K = 20, 45% of nodes assigned MNNs, 5.53 cells per node"
-[1] "K = 50, 60% of nodes assigned MNNs, 12.72 cells per node"
-[1] "K = 100, 70% of nodes assigned MNNs, 25.26 cells per node"
-[1] "K = 200, 78% of nodes assigned MNNs, 51.79 cells per node"
+[1] "K = 200, 84% of nodes assigned MNNs, 66.6 cells per node"
 
-pd_internal_x = read.table(paste0(work_path, "/tree_analysis/impute_nodes/internal_assign_cells_200.txt"), sep="\t")
-df = pd_internal_x %>% group_by(V2) %>% tally()
-
+df = pd_internal_x %>% group_by(node_id) %>% tally()
 
 p = ggplot(df, aes(x = n)) +
     geom_histogram(bins = 30, fill = "#8d99ae", color = "white") +
@@ -350,6 +346,45 @@ p = ggplot(df, aes(x = n)) +
     theme_classic()
 ggsave("~/share/hist_assignment.pdf", p, width = 3.5, height=5)
 
+
+x = pd_out %>% filter(cell_id == "internal_node", celltype != "missing") %>%
+    group_by(day) %>% tally() %>% 
+    left_join(pd_out %>% filter(cell_id == "internal_node") %>%
+    group_by(day) %>% tally() %>% rename(total_n = n), by = "day") %>%
+    mutate(frac = 100*n/total_n) %>% arrange(frac)
+
+print(sum(x$n)/sum(x$total_n))
+#87.9%; 926852/1054879
+
+day         n total_n  frac
+E8.5     6905   14930  46.2
+E8.75    7692   16753  45.9
+E9.0     9503   18647  51.0
+E9.25   12560   20927  60.0
+E9.5    16778   23731  70.7
+E9.75   19826   25548  77.6
+E10.0   22851   29781  76.7
+E10.25  26607   30871  86.2
+E10.5   28046   33525  83.7
+E10.75  34294   37133  92.4
+E11.0   37344   40018  93.3
+E11.25  38885   41192  94.4
+E11.5   43363   45318  95.7
+E11.75  47803   49578  96.4
+E12.0   47551   49040  97.0
+E12.25  50363   51505  97.8
+E12.5   67436   70198  96.1
+E12.75  59633   61838  96.4
+E13.0   49526   50988  97.1
+E13.25 299886  343358  87.3
+
+E11.5   95.7
+E11.75  96.4
+E12.0   97.0
+E12.25  97.8
+E12.5   96.1
+E12.75  96.4
+E13.0   97.1
 
 ###############################################################################
 ### Step-5: Identifying the trajectories giving rise to each cell type at E13.5
@@ -433,8 +468,11 @@ import pickle
 
 work_path = "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
-pca_original = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca_100.csv", index_col=0)
+pca_original = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.pca.csv", index_col=0)
 pd_original = pd.read_csv(f"{work_path}/transcriptome_analysis/adata_integration_early.obs.csv", index_col=0)
+pd_original_add_more = pd.read_csv(f"{work_path}/tree_analysis/impute_nodes/pd.txt", sep="\t", index_col=0)
+pd_original.index.equals(pd_original_add_more.index)
+pd_original['day'] = pd_original_add_more['day']
 pca_original.index = pd_original.index
 
 node_assign = pd.read_csv(f"{work_path}/tree_analysis/impute_nodes/internal_assign_cells_200.txt", sep = "\t")
@@ -442,7 +480,7 @@ node_assign.columns = ['cell_id', 'node', 'day', 'celltype']
 merged = node_assign.merge(pca_original, left_on='cell_id', right_index=True, how='inner')
 pc_cols = pca_original.columns.tolist()
 node_pca = merged.groupby('node')[pc_cols].mean()
-### n = 896782 internal nodes
+### n = 926852 internal nodes
 
 node_pca.to_csv(f"{work_path}/tree_analysis/impute_nodes/node_pca.csv",
            index=True)
@@ -466,6 +504,7 @@ pca_sub = pca_sub.loc[idx_keep]
 # --- Sanity check ---
 print(pd_sub.shape, pca_sub.shape)
 print(pd_sub['day'].value_counts().sort_index())
+# n = 1046253 cells
 
 reducer = umap.UMAP(
     n_components   = 2,
@@ -478,14 +517,15 @@ reducer = umap.UMAP(
 
 embedding = reducer.fit_transform(pca_sub.values)
 
+pd_sub['cell_id'] = pd_sub.index
 umap_df = pd_sub[['cell_id', 'day']].copy()
 umap_df['UMAP_1'] = embedding[:, 0]
 umap_df['UMAP_2'] = embedding[:, 1]
 
-umap_df.to_csv(f"{work_path}/tree_analysis/impute_nodes/UMAP_backbone.csv",
+umap_df.to_csv(f"{work_path}/tree_analysis/impute_nodes/umap/UMAP_backbone.csv",
            index=True)
 
-with open(f"{work_path}/tree_analysis/impute_nodes/umap_model.pkl", "wb") as f:
+with open(f"{work_path}/tree_analysis/impute_nodes/umap/umap_model.pkl", "wb") as f:
     pickle.dump(reducer, f)
 
 new_embedding = reducer.transform(node_pca.values)
@@ -496,7 +536,7 @@ new_embedding_df = pd.DataFrame(
     columns=['UMAP_1', 'UMAP_2']
 )
 
-new_embedding_df.to_csv(f"{work_path}/tree_analysis/impute_nodes/UMAP_new.csv",
+new_embedding_df.to_csv(f"{work_path}/tree_analysis/impute_nodes/umap/UMAP_new.csv",
            index=True)
 
 
@@ -508,22 +548,21 @@ work_path <- "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
 df = read.table(paste0(work_path, "/tree_analysis/impute_nodes/pd_nodes_infer_200.txt"), sep="\t", header=T)
 
-umap_coor = read.csv(paste0(work_path, "/tree_analysis/impute_nodes/UMAP_new.csv"))
+umap_coor = read.csv(paste0(work_path, "/tree_analysis/impute_nodes/umap/UMAP_new.csv"))
 colnames(umap_coor) = c("node_id", "UMAP_1", "UMAP_2")
 
 df = df %>% left_join(umap_coor, by = "node_id") %>% filter(!is.na(UMAP_1))
-### 896782 internal nodes assigned
+### 926852 internal nodes assigned
 
 df$day = factor(df$day, level = names(day_color_plate))
 table(df$day)
 
 major_trajectory_table = read.table(paste0(work_path, "/tree_analysis/major_trajectory_celltype_table.txt"), sep="\t", header=T)
 df = df %>% left_join(major_trajectory_table, by = "celltype")
-### 896782 cells
+### 926852 cells
 
 pd_jax = readRDS("/net/shendure/vol2/projects/cxqiu/JAX_rna_mm39/pd.rds")
-pd_jax$cell_id = paste0(pd_jax$experiment_id, "_", pd_jax$cell_id)
-umap_coor = read.csv(paste0(work_path, "/tree_analysis/impute_nodes/UMAP_backbone.csv"))
+umap_coor = read.csv(paste0(work_path, "/tree_analysis/impute_nodes/umap/UMAP_backbone.csv"))
 df_backbone = umap_coor %>% left_join(pd_jax[,c("celltype", "major_trajectory", "cell_id")], by = "cell_id")
 ### n = 1046253 cells
 
@@ -570,7 +609,11 @@ p = ggplot() +
 ggsave("~/share/Fig7_umap_day_jax.png", p, dpi = 300, height = 5, width = 5)
 
 
-
+### Three important profiles:
+### internal_assign_cells_200.txt: MNN pairs between internal nodes and JAX cells
+### pd_nodes_infer_200.txt: internal nodes and tips' cell types
+### pca_impute_full.tsv: internal nodes and tips' PCs, directly imputed by descendants
+### node_pca.csv: internal nodes' PCs, after updating by its MNNs
 
 
 

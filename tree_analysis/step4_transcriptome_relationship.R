@@ -12,10 +12,10 @@ library(ggrepel)
 work_path <- "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
 # ---- Load data ----
-cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v6.txt"),
+cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v8.txt"),
                         header = TRUE, sep = "\t")
 
-tree <- read.tree(paste0(work_path, "/tree_analysis/tree_qc_pass.nwk"))
+tree <- read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
 
 # ---- Function 1: extract sibling pairs and annotate ----
 analyze_clade <- function(subtree, cell_meta) {
@@ -137,7 +137,7 @@ X = pca_coor.values if isinstance(pca_coor, pd.DataFrame) else pca_coor
 
 # --- Vectorized Euclidean distance ---
 diff = X[iA] - X[iB]
-sib['euclid_pc30'] = np.sqrt(np.einsum('ij,ij->i', diff, diff))
+sib['euclid_pc50'] = np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
 print(sib.head())
 sib.to_csv(f"{work_path}/tree_analysis/transcriptome_relationship/sibling_pairs_dist.txt",
@@ -153,16 +153,16 @@ res <- res %>%
     mutate(sibling = if_else(sibling == "True", "sibling", "not_sibling"),
            sibling = factor(sibling, levels = c("sibling", "not_sibling")))
 
-p = ggplot(res, aes(x = sibling, y = euclid_pc30, fill = sibling)) +
+p = ggplot(res, aes(x = sibling, y = euclid_pc50, fill = sibling)) +
     geom_violin(trim = FALSE, alpha = 0.7) +
     geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white") +
     scale_fill_manual(values = c("sibling" = "#d1495b", "not_sibling" = "#8d99ae")) +
-    coord_cartesian(ylim = c(0, 15)) +           # zoom, doesn't drop data
+    coord_cartesian(ylim = c(0, 25)) +           # zoom, doesn't drop data
     labs(x = NULL, y = "Euclidean distance") +
     theme_classic(base_size = 11) +
     theme(legend.position = "none")
 
-fit = wilcox.test(res$euclid_pc30[res$sibling == "sibling"], res$euclid_pc30[res$sibling != "sibling"])
+fit = wilcox.test(res$euclid_pc50[res$sibling == "sibling"], res$euclid_pc50[res$sibling != "sibling"])
 ### p < 2.2e-16
 
 ggsave("~/share/sibling_pairs_dist.pdf", p, height=5, width=5)
@@ -186,9 +186,9 @@ library(castor)
 work_path <- "/net/shendure/vol2/projects/cxqiu/work/tapemouse"
 
 # ---- Load data ----
-cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v6.txt"),
+cell_meta <- read.table(paste0(work_path, "/tree_analysis/cell_metadata.v8.txt"),
                         header = TRUE, sep = "\t")
-tree <- read.tree(paste0(work_path, "/tree_analysis/tree_qc_pass.nwk"))
+tree <- read.tree(paste0(work_path, "/tree_analysis/merged_full_placed.nwk"))
 set.seed(1)
 PAIRS_PER_CT_CAP <- 100000
 PAIRS_PER_BIN    <- 10000
@@ -281,7 +281,7 @@ X = pca_coor.values if isinstance(pca_coor, pd.DataFrame) else pca_coor
 
 # --- Vectorized Euclidean distance ---
 diff = X[iA] - X[iB]
-sib['euclid_pc30'] = np.sqrt(np.einsum('ij,ij->i', diff, diff))
+sib['euclid_pc50'] = np.sqrt(np.einsum('ij,ij->i', diff, diff))
 
 print(sib.head())
 sib.to_csv(f"{work_path}/tree_analysis/transcriptome_relationship/distance_pairs_dist.txt",
@@ -297,19 +297,19 @@ res$MRCA_day = paste0("E", res$dist_bin)
 res$MRCA_day = factor(res$MRCA_day, levels = paste0("E", 0:13))
 
 # --- Plot ---
-p <- ggplot(res, aes(x = MRCA_day, y = euclid_pc30, fill = MRCA_day)) +
+p <- ggplot(res, aes(x = MRCA_day, y = euclid_pc50, fill = MRCA_day)) +
     geom_violin(trim = FALSE, alpha = 0.7) +
     geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white") +
     scale_fill_viridis_d(option = "D") +
-    coord_flip(ylim = c(0, 15)) +
+    coord_flip(ylim = c(0, 25)) +
     labs(x = "MRCA", y = "Euclidean distance") +
     theme_classic(base_size = 11) +
     theme(legend.position = "none")
 
 ggsave("~/share/distance_pairs_dist.pdf", p, height=5, width=4)
 
-cor.test(res$dist_bin, res$euclid_pc30, method = "spearman")
-### r = -0.1, p = < 1e-222
+cor.test(res$dist_bin, res$euclid_pc50, method = "spearman")
+### r = -0.1, p = < 1e-250
 
 
 
